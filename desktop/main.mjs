@@ -9,7 +9,9 @@ startDesktopApp({
   root: fileURLToPath(new URL("..", import.meta.url)),
   documentExtensions: [".etex"],
   importExtensions: [".docx", ".html", ".htm", ".md", ".markdown", ".txt", ".pdf"],
-  // Open and Recent also accept these (opened as they are, without creating an .etex; Save asks where to save the .etex).
+  // Open and Recent also accept these (opened as they are, without creating an .etex)…
   openExtensions: [".docx", ".md", ".markdown", ".txt", ".pdf", ".html", ".htm"],
+  // …and saves these back into the file they were opened from (app-config.js, file.saveOriginal).
+  saveExtensions: [".docx", ".md", ".markdown", ".txt", ".html", ".htm"],
   exportFormats: ["html", "pdf", "md", "txt", "docx"],
 });

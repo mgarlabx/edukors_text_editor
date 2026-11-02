@@ -18,7 +18,10 @@ globalThis.EdukorsAppConfig = {
       { id: 'md', extensions: ['.md', '.markdown'] },
       { id: 'text', extensions: ['.txt'] },
       { id: 'pdf', extensions: ['.pdf'] }
-    ]
+    ],
+    // Files opened in these formats are saved back into themselves (import format → export format). Not PDF: it opens
+    // as text only, so writing it back would replace the original with that text; Save asks for an .etex instead.
+    saveOriginal: { docx: 'docx', md: 'md', text: 'txt', html: 'html' }
   },
   help: {
     quickGuide: {

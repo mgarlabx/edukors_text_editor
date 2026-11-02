@@ -404,11 +404,14 @@ addEventListener("resize", () => renderBubble());
 // After a save, the saved content is the baseline for "modified".
 document.addEventListener("edukors:document-saved", (event) => { const doc = event.detail.doc; editOf(doc).saved = editOf(doc).state.doc; markModified(doc); });
 document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); });
-// Clicking the empty part of the page below the text puts the cursor at the end.
+// Clicking the empty part of the page below the text puts the cursor at the end. When the document ends with a table,
+// a picture, or a shape, an empty paragraph is added after it first, so there is always a place to keep writing.
 document.addEventListener("mousedown", (event) => {
   if (!view || event.target !== page()) return;
   event.preventDefault();
-  view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)));
+  const { doc } = view.state, tr = view.state.tr;
+  if (!doc.lastChild.isTextblock) tr.insert(doc.content.size, nodes.paragraph.create());
+  view.dispatch(tr.setSelection(TextSelection.atEnd(tr.doc)).scrollIntoView());
   view.focus();
 });
 
