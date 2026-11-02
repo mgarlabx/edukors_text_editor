@@ -4,7 +4,7 @@
 //
 // Each open document keeps its own editor state (content, selection, undo history) in doc.editor; one view shows the
 // active one. A document is modified while its content differs from what was last saved or opened.
-import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { baseKeymap, toggleMark, setBlockType, wrapIn, lift, deleteSelection, chainCommands, exitCode } from "prosemirror-commands";
 import { history, undo, redo, undoDepth, redoDepth } from "prosemirror-history";
@@ -15,6 +15,9 @@ import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { schema, emptyDoc, docFromJSON, ALIGNS, DEFAULT_FONT, DEFAULT_SIZE, SIZE_RANGE } from "./schema.js";
 import { exportDocument, importDocument } from "./convert.js";
+import { nodeViews, insertShape, insertImageFromFile } from "./media.js";
+import { renderPageBreaks } from "./pages.js";
+import { media } from "./schema.js";
 
 const { nodes, marks } = schema;
 const mac = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform || "");
@@ -147,7 +150,12 @@ function markModified(doc) {
   document.dispatchEvent(new CustomEvent("edukors:document-modified", { detail: { id: doc.id } }));
 }
 
+// What the selection is: a picture, a shape, or text. The format bar shows the groups for it.
+const kindOf = (state) => (state.selection instanceof NodeSelection && (state.selection.node.type === nodes.image || state.selection.node.type === nodes.shape) ? state.selection.node.type.name : "text");
+const GROUPS = { text: ["blockStyle", "text", "align", "lists", "link"], image: ["align"], shape: ["shape", "align"] };
+
 function readFormat(state) {
+  if (kindOf(state) !== "text") { Object.assign(format, state.selection.node.attrs); return; }
   Object.assign(format, {
     blockStyle: blockStyle(state),
     bold: markActive(state, marks.strong), italic: markActive(state, marks.em), underline: markActive(state, marks.underline), strike: markActive(state, marks.strike),
@@ -164,6 +172,16 @@ function readFormat(state) {
 function onFormat(property, value) {
   if (!view) return;
   const run = (command) => command(view.state, view.dispatch);
+  // A picture or shape: its own attributes (a block is left, center, or right; justify means center).
+  if (kindOf(view.state) !== "text") {
+    const { node, from } = view.state.selection;
+    if (!(property in node.attrs)) return;
+    const next = property === "align" && value === "justify" ? "center" : value;
+    const tr = view.state.tr.setNodeMarkup(from, null, { ...node.attrs, [property]: next });
+    view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, from)));
+    view.focus();
+    return;
+  }
   const toggle = { bold: marks.strong, italic: marks.em, underline: marks.underline, strike: marks.strike };
   if (toggle[property]) {
     const type = toggle[property];
@@ -181,16 +199,50 @@ function onFormat(property, value) {
   view.focus();
 }
 
+// Page breaks: shown by default; the choice is kept on this computer.
+const BREAKS_KEY = "edukors.text.pageBreaks";
+let showBreaks = (() => { try { return localStorage.getItem(BREAKS_KEY) !== "false"; } catch { return true; } })();
+const BREAKS_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V4h9l3 3v2"/><path d="M6 15v5h12v-5"/><path d="M3 12h2.5M8 12h3M13.5 12h3M19 12h2"/></svg>';
+function breaksButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "format-button icon";
+  button.dataset.control = "pageBreaks";
+  button.setAttribute("aria-pressed", String(showBreaks));
+  button.setAttribute("aria-label", t("showPageBreaks"));
+  button.innerHTML = `${BREAKS_ICON}<span class="tooltip" aria-hidden="true"></span>`;
+  button.querySelector(".tooltip").textContent = t("showPageBreaks");
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+  button.addEventListener("click", () => {
+    showBreaks = !showBreaks;
+    try { localStorage.setItem(BREAKS_KEY, String(showBreaks)); } catch { /* kept for this session only */ }
+    button.setAttribute("aria-pressed", String(showBreaks));
+    renderBreaks();
+  });
+  return button;
+}
+const renderBreaks = () => { if (view) renderPageBreaks(page(), view.dom, showBreaks, (n) => t("pageNumber").replace("{n}", n)); };
+
+let toolbarKind = null;
 function renderToolbar() {
   const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
-  if (!view) { slot.classList.remove("is-open", "is-settled"); slot.inert = true; toolbar = null; bar.replaceChildren(); return; }
+  if (!view) { slot.classList.remove("is-open", "is-settled"); slot.inert = true; toolbar = null; toolbarKind = null; bar.replaceChildren(); return; }
+  const kind = kindOf(view.state);
   readFormat(view.state);
-  if (!toolbar) {
+  if (!toolbar || kind !== toolbarKind) {
     bar.setAttribute("aria-label", t("contextToolbar"));
-    toolbar = EdukorsFormat.render(bar, {
-      groups: ["blockStyle", "text", "align", "lists", "link"], state: format, t, onChange: onFormat,
+    // The shared groups render into their own holder; the page-break switch sits at the end of the bar.
+    const groups = document.createElement("div");
+    groups.className = "text-format-groups";
+    const end = document.createElement("div");
+    end.className = "format-group text-view-group";
+    end.append(breaksButton());
+    bar.replaceChildren(groups, end);
+    toolbar = EdukorsFormat.render(groups, {
+      groups: GROUPS[kind], state: format, t, onChange: onFormat,
       options: { fontSizes: FONT_SIZES, fontFamilies: FONT_FAMILIES, fontSizeRange: { ...SIZE_RANGE, step: 0.5 }, linkQr: false },
     });
+    toolbarKind = kind;
     slot.classList.add("is-open", "is-settled");
     slot.inert = false;
   } else toolbar.refresh();
@@ -226,6 +278,23 @@ async function runEdit(key) {
 }
 for (const key of EDIT) editButton(key)?.addEventListener("click", () => runEdit(key));
 
+// Insert: a shape from Common's picker, under the button; a picture from a file.
+const insertButton = (key) => document.querySelector(`#insert-actions [data-command="${key}"]`);
+insertButton("insertShape")?.addEventListener("click", () => {
+  if (!view) return;
+  const anchor = insertButton("insertShape").getBoundingClientRect(), target = view;
+  EdukorsShapes.pick({ x: anchor.left, y: anchor.bottom + 6, t, restoreFocus: view.dom, onPick: (type) => { if (view === target) insertShape(view, type); } });
+});
+insertButton("insertImage")?.addEventListener("click", () => {
+  if (view) insertImageFromFile(view, (name) => EdukorsFileDialogs.toast({ t, message: EdukorsFileDialogs.fill(t("importFailed"), { name, reason: t("importNotImage") }) }));
+});
+function renderInsert() {
+  for (const key of ["insertShape", "insertImage"]) {
+    const button = insertButton(key);
+    if (button) { if (view) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true"); }
+  }
+}
+
 // The formatting bar lies over the top of the document area (Common's contextual toolbar); the page scrolls below it,
 // so nothing is hidden behind the bar, also when it wraps onto two rows.
 const fitBelowBar = new ResizeObserver(() => {
@@ -237,7 +306,8 @@ fitBelowBar.observe(document.getElementById("context-toolbar"));
 function show(doc) {
   const host = page();
   if (!doc) {
-    view?.destroy(); view = null; active = null; renderToolbar(); renderEdit();
+    view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert();
+    renderPageBreaks(host, null, false);
     document.querySelector(".workspace")?.classList.remove("text-workspace");
     document.querySelector(".document-body").style.marginTop = "";
     return;
@@ -251,6 +321,7 @@ function show(doc) {
     host.replaceChildren();
     view = new EditorView(host, {
       state: editor.state,
+      nodeViews,
       attributes: { spellcheck: "true", "aria-label": t("fmtText") || "Text", role: "textbox", "aria-multiline": "true" },
       dispatchTransaction(tr) {
         const state = view.state.apply(tr);
@@ -258,10 +329,13 @@ function show(doc) {
         editOf(active).state = state;
         if (tr.docChanged) markModified(active);
         renderToolbar(); renderEdit();
+        if (tr.docChanged) renderBreaks();
       },
     });
+    // Pictures that finish loading, and wrapping text, change the height: the page-break marks follow.
+    new ResizeObserver(() => renderBreaks()).observe(view.dom);
   } else view.updateState(editor.state);
-  renderToolbar(); renderEdit();
+  renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
   document.querySelector(".document-body").style.marginTop = `${document.getElementById("context-toolbar").offsetHeight}px`;
 }
 
@@ -290,5 +364,7 @@ globalThis.EdukorsTextEditor = Object.freeze({
   selectAll() { if (view) { view.focus(); view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 0, view.state.doc.content.size))); } },
   /** Export and Import (src/editor/convert.js): exportDocument(json, format, title), importDocument(format, bytes). */
   exportDocument, importDocument,
+  /** The pictures of all open documents (key → { blob, url }); document.js saves and opens them as package parts. */
+  media,
   get view() { return view; },
 });

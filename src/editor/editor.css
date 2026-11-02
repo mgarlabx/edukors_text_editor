@@ -5,7 +5,7 @@
 .workspace.text-workspace { display: block; overflow: auto; padding: 32px 24px 64px; }
 #document-placeholder.text-page {
   position: relative; display: block; width: min(794px, 100%); max-height: none; aspect-ratio: auto; min-height: 1123px;
-  margin: 0 auto; padding: 72px 76px; box-sizing: border-box; border-radius: 2px; background: #fff; color: #000;
+  margin: 0 auto; padding: 75.6px 76px; box-sizing: border-box; border-radius: 2px; background: #fff; color: #000;
   font: 12pt/1.5 Arial, Helvetica, sans-serif; cursor: text; user-select: text;
 }
 .text-page .ProseMirror { min-height: 900px; outline: none; white-space: pre-wrap; overflow-wrap: break-word; }
@@ -22,4 +22,29 @@
 .text-page li > p { margin-bottom: 2pt; }
 .text-page a { color: #1155cc; text-decoration: underline; }
 .text-page hr { margin: 12pt 0; border: 0; border-top: 1px solid #c9cdd8; }
-.text-page .ProseMirror-selectednode { outline: 2px solid #6156db; }
+.text-page .ProseMirror-selectednode { outline: none; }
+
+/* Pictures and shapes: blocks aligned left, center, or right, never wider than the text. */
+.text-page .doc-media { margin: 0 0 8pt; line-height: 0; }
+.text-page .doc-media[data-align="left"] { text-align: left; }
+.text-page .doc-media[data-align="center"] { text-align: center; }
+.text-page .doc-media[data-align="right"] { text-align: right; }
+.text-page .doc-media-box { position: relative; display: inline-block; max-width: 100%; }
+.text-page .doc-media-box > img { display: block; max-width: 100%; height: auto; }
+.text-page .doc-media-box > svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.text-page .doc-media.is-selected .doc-media-box { outline: 2px solid #6156db; outline-offset: 2px; }
+.text-page .doc-media-handle { position: absolute; right: -6px; bottom: -6px; display: none; width: 11px; height: 11px; border: 2px solid #fff; border-radius: 3px; background: #6156db; box-shadow: 0 0 0 1px #6156db; cursor: nwse-resize; touch-action: none; }
+.text-page .doc-media[data-align="right"] .doc-media-handle { right: auto; left: -6px; cursor: nesw-resize; }
+.text-page .doc-media.is-selected .doc-media-handle { display: block; }
+
+/* Page breaks (src/editor/pages.js): a dashed line across the page where an A4 page of the PDF ends, with the number
+   of the page that begins, in the right margin. */
+.text-page .page-breaks { position: absolute; inset: 0; pointer-events: none; }
+.text-page .page-break { position: absolute; left: 0; right: 0; border-top: 1px dashed #b4bccd; }
+.text-page .page-break::after { content: attr(data-label); position: absolute; right: 8px; top: 3px; color: #8a93a8; font: 500 10px/1 Arial, sans-serif; letter-spacing: .02em; }
+
+/* The bar: Common's groups, then the page-break switch at the end. */
+.context-toolbar .text-format-groups { display: contents; }
+.context-toolbar .text-view-group { margin-left: auto; }
+/* The last control's tooltip opens to the left, inside the window. */
+.context-toolbar .text-view-group .tooltip { left: auto; right: 0; transform: none; }

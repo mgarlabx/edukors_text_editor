@@ -4,14 +4,18 @@
 //   Import: HTML, Markdown, plain text, DOCX (through mammoth), and PDF (the text only, through pdf.js).
 //
 // Everything imported goes through the document schema (src/editor/schema.js), so only what a document may contain
-// is kept: scripts, styles, event attributes, unsafe links, and unknown elements are dropped. Images and tables are
-// not part of documents yet: images are left out, and a table's cells become paragraphs.
+// is kept: scripts, styles, event attributes, unsafe links, and unknown elements are dropped. Pictures come in when
+// they are inside the file (DOCX, or data: URLs in HTML); pictures on the web are not fetched. Tables are not part of
+// documents yet: a table's cells become paragraphs. Markdown and plain text leave pictures and shapes out.
+// Shapes go to HTML and PDF as SVG and to DOCX as pictures.
 import { DOMParser as SchemaParser, DOMSerializer } from "prosemirror-model";
 import { MarkdownParser, MarkdownSerializer, defaultMarkdownParser, defaultMarkdownSerializer } from "prosemirror-markdown";
 import MarkdownIt from "markdown-it";
-import { AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, LevelFormat, Packer, Paragraph, TextRun } from "docx";
+import { AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, LevelFormat, Packer, Paragraph, TextRun } from "docx";
 import mammoth from "mammoth/mammoth.browser.js";
-import { schema, docFromJSON, safeHref, DEFAULT_FONT, DEFAULT_SIZE } from "./schema.js";
+import { schema, docFromJSON, safeHref, media, DEFAULT_FONT, DEFAULT_SIZE } from "./schema.js";
+
+const CONTENT_WIDTH = 642; // the A4 text width at 96 dpi (170 mm)
 
 const { nodes, marks } = schema;
 const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -26,6 +30,7 @@ h1:first-child,h2:first-child,h3:first-child,p:first-child{margin-top:0}
 blockquote{margin:0 0 8pt;padding:2pt 0 2pt 14pt;border-left:3pt solid #c9cdd8;color:#3c4252}
 pre{margin:0 0 8pt;padding:8pt 10pt;border-radius:4px;background:#f3f4f7;font:10.5pt/1.45 "Courier New",monospace;white-space:pre-wrap}
 code{padding:0 2pt;border-radius:3px;background:#f3f4f7;font-family:"Courier New",monospace;font-size:.92em}pre code{padding:0;background:none}
+figure{margin:0 0 8pt;line-height:0}figure img,figure svg{max-width:100%;height:auto}li,figure{break-inside:avoid}
 ul,ol{margin:0 0 8pt;padding-left:24pt}li>p{margin-bottom:2pt}a{color:#1155cc}hr{margin:12pt 0;border:0;border-top:1px solid #c9cdd8}
 h1,h2,h3{break-after:avoid}li,blockquote,pre{break-inside:avoid}`;
 
@@ -34,8 +39,18 @@ function bodyHTML(doc) {
   holder.append(DOMSerializer.fromSchema(schema).serializeFragment(doc.content, { document }));
   return holder.innerHTML;
 }
-export const toHTML = (doc, title = "") =>
-  `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PAGE_CSS}</style></head><body>${bodyHTML(doc)}</body></html>\n`;
+const dataURL = (blob) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+// One self-contained page: pictures inline as data: URLs, shapes as SVG.
+export async function toHTML(doc, title = "") {
+  const holder = document.createElement("div");
+  holder.innerHTML = bodyHTML(doc);
+  for (const img of holder.querySelectorAll("img[data-media]")) {
+    const entry = media.get(img.dataset.media);
+    if (entry) img.src = await dataURL(entry.blob); else img.closest("figure")?.remove();
+    img.removeAttribute("data-media");
+  }
+  return `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PAGE_CSS}</style></head><body>${holder.innerHTML}</body></html>\n`;
+}
 
 // HTML from anywhere is parsed inert (nothing runs or loads) and read through the schema.
 export function fromHTML(html) {
@@ -72,7 +87,7 @@ export const fromMarkdown = (text) => markdownParser.parse(String(text));
 
 const plain = { open: "", close: "", mixable: true };
 const markdownSerializer = new MarkdownSerializer(
-  { ...defaultMarkdownSerializer.nodes },
+  { ...defaultMarkdownSerializer.nodes, image: (state, node) => state.closeBlock(node), shape: (state, node) => state.closeBlock(node) },
   { ...defaultMarkdownSerializer.marks, strike: { open: "~~", close: "~~", mixable: true, expelEnclosingWhitespace: true },
     underline: plain, sub: plain, sup: plain, font: plain, size: plain, color: plain },
 );
@@ -96,6 +111,7 @@ export function toText(doc) {
   };
   const walk = (node, indent = "", quote = "") => {
     node.forEach((child) => {
+      if (child.type === nodes.image || child.type === nodes.shape) return; // pictures and shapes have no text
       if (isList(child)) list(child, indent, quote);
       else if (child.type === nodes.blockquote) walk(child, indent, `${quote}> `);
       else if (child.type === nodes.horizontal_rule) blocks.push(`${quote}${"—".repeat(12)}`);
@@ -147,7 +163,42 @@ function runsOf(block) {
   return out.map((item) => (item instanceof TextRun ? item : new ExternalHyperlink({ link: item.href, children: item.children })));
 }
 
-function docxBlocks(doc) {
+// Pictures for Word: PNG, JPEG, GIF, and BMP as they are; other pictures and shapes drawn to PNG first (twice the size,
+// for sharpness). Sizes in pixels at 96 dpi, at most the text width.
+const DOCX_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/bmp": "bmp" };
+const loadImage = (url) => new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error("A picture could not be read.")); img.src = url; });
+async function toPNG(url, width, height) {
+  const img = await loadImage(url), canvas = document.createElement("canvas");
+  canvas.width = Math.round(width * 2); canvas.height = Math.round(height * 2);
+  canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+async function docxPictures(doc) {
+  const pictures = new Map(); // node → { data, type, width, height }
+  const jobs = [];
+  doc.descendants((node) => {
+    if (node.type === nodes.image) jobs.push((async () => {
+      const entry = media.get(node.attrs.src);
+      if (!entry) return;
+      const img = await loadImage(entry.url);
+      const width = Math.min(node.attrs.width ?? img.naturalWidth, CONTENT_WIDTH), height = Math.round((width * img.naturalHeight) / (img.naturalWidth || 1));
+      const type = DOCX_TYPES[entry.blob.type];
+      pictures.set(node, { type: type ?? "png", width, height, data: type ? new Uint8Array(await entry.blob.arrayBuffer()) : await toPNG(entry.url, width, height) });
+    })());
+    if (node.type === nodes.shape) jobs.push((async () => {
+      const { width, height } = node.attrs, svg = EdukorsShapes.svg(node.attrs, width, height);
+      const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+      try { pictures.set(node, { type: "png", width: Math.min(width, CONTENT_WIDTH), height: Math.round(height * Math.min(1, CONTENT_WIDTH / width)), data: await toPNG(url, width, height) }); }
+      finally { URL.revokeObjectURL(url); }
+    })());
+    return true;
+  });
+  await Promise.all(jobs);
+  return pictures;
+}
+
+function docxBlocks(doc, pictures = new Map()) {
   const out = [];
   let listInstance = 0;
   const walk = (node, context) => {
@@ -159,6 +210,11 @@ function docxBlocks(doc) {
       else if (child.type === nodes.code_block) {
         child.textContent.split("\n").forEach((line) => out.push(new Paragraph({ ...base, style: "Code", children: [new TextRun(line)] })));
       } else if (child.type === nodes.horizontal_rule) out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "C9CDD8", space: 1 } } }));
+      else if (child.type === nodes.image || child.type === nodes.shape) {
+        const picture = pictures.get(child);
+        if (picture) out.push(new Paragraph({ alignment: ALIGN[child.attrs.align], children: [new ImageRun({ type: picture.type, data: picture.data, transformation: { width: picture.width, height: picture.height },
+          altText: { name: child.type === nodes.image ? "Picture" : "Shape", title: child.attrs.alt || "", description: child.attrs.alt || "" } })] }));
+      }
       else if (child.type === nodes.blockquote) walk(child, { ...context, quote: true });
       else if (child.type === nodes.bullet_list || child.type === nodes.ordered_list) {
         const level = (context.level ?? -1) + 1, reference = child.type === nodes.bullet_list ? "bullets" : "numbers", instance = ++listInstance;
@@ -200,20 +256,27 @@ export async function toDOCX(doc, title = "") {
       { reference: "bullets", levels: listLevels(LevelFormat.BULLET, (level) => ["•", "◦", "▪"][level % 3]) },
       { reference: "numbers", levels: listLevels(LevelFormat.DECIMAL, (level) => `%${level + 1}.`) },
     ] },
-    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } }, children: docxBlocks(doc) }],
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } }, children: docxBlocks(doc, await docxPictures(doc)) }],
   });
   return new Uint8Array(await (await Packer.toBlob(file)).arrayBuffer());
 }
 
 // Word documents through mammoth, as HTML: headings, paragraphs, lists, bold, italic, underline, strikethrough, sub- and
-// superscript, and links come through. Pictures are left out; colors, sizes, fonts, and alignment are not read.
+// superscript, links, and pictures (as data: URLs, at their own size) come through; colors, sizes, fonts, and
+// alignment are not read.
 export async function fromDOCX(bytes) {
   const result = await mammoth.convertToHtml({ arrayBuffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) }, {
     // Word's quote styles become quotes and the "Code" style a code block, so the app's own DOCX comes back whole.
     styleMap: ["u => u", "strike => s", "p[style-name='Quote'] => blockquote > p:fresh", "p[style-name='Intense Quote'] => blockquote > p:fresh", "p[style-name='Code'] => pre:separator('\\n')"],
-    convertImage: mammoth.images.imgElement(() => ({ src: "" })),
   });
-  return fromHTML(result.value);
+  // Word keeps each picture inside a paragraph; the empty paragraphs that leaves around it are dropped.
+  const doc = fromHTML(result.value), kept = [];
+  const isMedia = (node) => node && (node.type === nodes.image || node.type === nodes.shape);
+  doc.forEach((node, _offset, index) => {
+    const empty = node.type === nodes.paragraph && node.childCount === 0;
+    if (!(empty && (isMedia(doc.maybeChild(index - 1)) || isMedia(doc.maybeChild(index + 1))))) kept.push(node);
+  });
+  return nodes.doc.create(null, kept.length ? kept : [nodes.paragraph.create()]);
 }
 
 // ---------- PDF (text only) ----------
@@ -248,7 +311,7 @@ export async function fromPDF(bytes) {
 /** Export: { html, width, height } for HTML and PDF (the host prints the PDF); { data } for the other formats. */
 export async function exportDocument(json, format, title) {
   const doc = docFromJSON(json);
-  if (format === "html" || format === "pdf") return { html: toHTML(doc, title), width: 794, height: 1123 };
+  if (format === "html" || format === "pdf") return { html: await toHTML(doc, title), width: 794, height: 1123 };
   if (format === "md") return { data: toMarkdown(doc) };
   if (format === "txt") return { data: toText(doc) };
   if (format === "docx") return { data: await toDOCX(doc, title) };
