@@ -4,8 +4,20 @@ globalThis.EdukorsAppConfig = {
   version: 'v.26.11.02',            // the release date; package.json holds the same date as 26.11.2
   // Version of the terms of use below. The app asks once per version; change it when the terms change.
   termsVersion: '2026-11-02',
-  // Documents are .etex packages (docs/document-package.md in Common). Export and import come with the editor.
-  file: { extension: '.etex', exportFormats: [], importFormats: [] },
+  // Documents are .etex packages (docs/document-package.md in Common). Export offers these formats in this order (the
+  // first is preselected); import reads the same ones, and a PDF gives its text only. The desktop host accepts only the
+  // extensions desktop/main.mjs lists.
+  file: {
+    extension: '.etex',
+    exportFormats: ['html', 'pdf', 'md', 'txt', 'docx'],
+    importFormats: [
+      { id: 'docx', extensions: ['.docx'] },
+      { id: 'html', extensions: ['.html', '.htm'] },
+      { id: 'md', extensions: ['.md', '.markdown'] },
+      { id: 'text', extensions: ['.txt'] },
+      { id: 'pdf', extensions: ['.pdf'] }
+    ]
+  },
   help: {
     quickGuide: {
       en: `# Quick guide

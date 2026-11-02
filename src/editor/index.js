@@ -1,0 +1,294 @@
+// The Text Editor's editing surface: ProseMirror on the page that Common's shell shows for the active document, the
+// shared formatting bar (EdukorsFormat) above it, and the shell's Edit buttons. Bundled into dist/editor.js
+// (tools/build.mjs) and loaded by Common's boot.js as one of the app's scripts; it exposes EdukorsTextEditor.
+//
+// Each open document keeps its own editor state (content, selection, undo history) in doc.editor; one view shows the
+// active one. A document is modified while its content differs from what was last saved or opened.
+import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorView } from "prosemirror-view";
+import { baseKeymap, toggleMark, setBlockType, wrapIn, lift, deleteSelection, chainCommands, exitCode } from "prosemirror-commands";
+import { history, undo, redo, undoDepth, redoDepth } from "prosemirror-history";
+import { keymap } from "prosemirror-keymap";
+import { wrapInList, splitListItem, liftListItem, sinkListItem } from "prosemirror-schema-list";
+import { inputRules, wrappingInputRule, textblockTypeInputRule, smartQuotes, emDash, ellipsis } from "prosemirror-inputrules";
+import { dropCursor } from "prosemirror-dropcursor";
+import { gapCursor } from "prosemirror-gapcursor";
+import { schema, emptyDoc, docFromJSON, ALIGNS, DEFAULT_FONT, DEFAULT_SIZE, SIZE_RANGE } from "./schema.js";
+import { exportDocument, importDocument } from "./convert.js";
+
+const { nodes, marks } = schema;
+const mac = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform || "");
+const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
+const FONT_FAMILIES = ["Arial", "Calibri", "Cambria", "Georgia", "Helvetica", "Times New Roman", "Verdana", "Courier New"];
+
+// ---------- Commands ----------
+// A mark is shown as active when the whole selection has it (or, with no selection, the typing position).
+const markActive = (state, type) => {
+  const { from, $from, to, empty } = state.selection;
+  if (empty) return !!type.isInSet(state.storedMarks || $from.marks());
+  let all = true, any = false;
+  state.doc.nodesBetween(from, to, (node) => { if (node.isText) { any = true; if (!type.isInSet(node.marks)) all = false; } });
+  return any && all;
+};
+const markAttr = (state, type, attr) => {
+  const { from, to, empty, $from } = state.selection;
+  if (empty) return type.isInSet(state.storedMarks || $from.marks())?.attrs[attr];
+  let value; let mixed = false;
+  state.doc.nodesBetween(from, to, (node) => {
+    if (!node.isText) return;
+    const found = type.isInSet(node.marks)?.attrs[attr];
+    if (value === undefined) value = found ?? null; else if (value !== (found ?? null)) mixed = true;
+  });
+  return mixed ? undefined : value ?? undefined;
+};
+// Sets a mark with attributes on the selection (or for the next typing when the selection is empty); null removes it.
+const setMark = (type, attrs) => (state, dispatch) => {
+  const { from, to, empty } = state.selection;
+  if (dispatch) {
+    const tr = state.tr;
+    if (empty) { tr.removeStoredMark(type); if (attrs) tr.addStoredMark(type.create(attrs)); }
+    else { tr.removeMark(from, to, type); if (attrs) tr.addMark(from, to, type.create(attrs)); }
+    dispatch(tr.scrollIntoView());
+  }
+  return true;
+};
+const setAlign = (align) => (state, dispatch) => {
+  const { from, to } = state.selection;
+  const tr = state.tr;
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (node.type === nodes.paragraph || node.type === nodes.heading) tr.setNodeMarkup(pos, null, { ...node.attrs, align: align === "left" ? null : align });
+  });
+  if (dispatch) dispatch(tr);
+  return true;
+};
+const listType = (state) => {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    const type = $from.node(d).type;
+    if (type === nodes.bullet_list) return "bulleted";
+    if (type === nodes.ordered_list) return "numbered";
+  }
+  return "none";
+};
+const inQuote = (state) => { const { $from } = state.selection; for (let d = $from.depth; d > 0; d--) if ($from.node(d).type === nodes.blockquote) return true; return false; };
+function blockStyle(state) {
+  const { $from, $to } = state.selection;
+  if (!$from.sameParent($to) && $from.parent.type !== $to.parent.type) return undefined;
+  const parent = $from.parent;
+  if (parent.type === nodes.heading) return `heading${parent.attrs.level}`;
+  if (parent.type === nodes.code_block) return "code";
+  return inQuote(state) ? "quote" : "paragraph";
+}
+function applyBlockStyle(view, style) {
+  const run = (command) => command(view.state, view.dispatch);
+  if (inQuote(view.state) && style !== "quote") run(lift);
+  if (style === "quote") { if (!inQuote(view.state)) { run(setBlockType(nodes.paragraph)); run(wrapIn(nodes.blockquote)); } return; }
+  if (style === "code") return void run(setBlockType(nodes.code_block));
+  const heading = /^heading([1-3])$/.exec(style);
+  run(heading ? setBlockType(nodes.heading, { level: Number(heading[1]) }) : setBlockType(nodes.paragraph));
+}
+function applyList(view, kind) {
+  const current = listType(view.state);
+  if (current !== "none") { while (listType(view.state) !== "none" && liftListItem(nodes.list_item)(view.state, view.dispatch)); }
+  if (kind !== "none" && kind !== current) wrapInList(kind === "bulleted" ? nodes.bullet_list : nodes.ordered_list)(view.state, view.dispatch);
+}
+function applyLink(view, href) {
+  const { state } = view;
+  const { empty, from } = state.selection;
+  if (!href) {
+    // An empty selection inside a link removes that link from its paragraph.
+    if (empty) {
+      const $pos = state.doc.resolve(from), mark = marks.link.isInSet(state.storedMarks || $pos.marks());
+      if (mark) view.dispatch(state.tr.removeMark($pos.start(), $pos.end(), mark));
+    } else view.dispatch(state.tr.removeMark(state.selection.from, state.selection.to, marks.link));
+    return;
+  }
+  if (empty) view.dispatch(state.tr.insertText(href, from).addMark(from, from + href.length, marks.link.create({ href })));
+  else view.dispatch(state.tr.removeMark(state.selection.from, state.selection.to, marks.link).addMark(state.selection.from, state.selection.to, marks.link.create({ href })));
+}
+
+// ---------- Plugins ----------
+function rules() {
+  return inputRules({ rules: [
+    ...smartQuotes, ellipsis, emDash,
+    textblockTypeInputRule(/^(#{1,3})\s$/, nodes.heading, (match) => ({ level: match[1].length })),
+    wrappingInputRule(/^\s*>\s$/, nodes.blockquote),
+    wrappingInputRule(/^\s*([-+*])\s$/, nodes.bullet_list),
+    wrappingInputRule(/^(\d+)\.\s$/, nodes.ordered_list, (match) => ({ order: Number(match[1]) }), (match, node) => node.childCount + node.attrs.order === Number(match[1])),
+    textblockTypeInputRule(/^```$/, nodes.code_block),
+  ] });
+}
+function keys() {
+  const map = {
+    "Mod-z": undo, "Shift-Mod-z": redo, "Mod-b": toggleMark(marks.strong), "Mod-i": toggleMark(marks.em), "Mod-u": toggleMark(marks.underline),
+    "Mod-Shift-x": toggleMark(marks.strike), "Mod-e": toggleMark(marks.code), "Mod-.": toggleMark(marks.sup), "Mod-,": toggleMark(marks.sub),
+    "Shift-Enter": chainCommands(exitCode, (state, dispatch) => { if (dispatch) dispatch(state.tr.replaceSelectionWith(nodes.hard_break.create()).scrollIntoView()); return true; }),
+    Enter: splitListItem(nodes.list_item), Tab: sinkListItem(nodes.list_item), "Shift-Tab": liftListItem(nodes.list_item),
+    "Mod-Alt-0": setBlockType(nodes.paragraph), "Mod-Alt-1": setBlockType(nodes.heading, { level: 1 }), "Mod-Alt-2": setBlockType(nodes.heading, { level: 2 }), "Mod-Alt-3": setBlockType(nodes.heading, { level: 3 }),
+  };
+  if (!mac) map["Mod-y"] = redo;
+  return [keymap(map), keymap(baseKeymap)];
+}
+const plugins = () => [rules(), ...keys(), history(), dropCursor(), gapCursor()];
+const newState = (doc) => EditorState.create({ schema, doc, plugins: plugins() });
+
+// ---------- The surface ----------
+const t = (key) => { const L = globalThis.EdukorsLanguages; return (L[document.documentElement.lang] || L.en).messages[key] || L.en.messages[key]; };
+let view = null, active = null, toolbar = null;
+const format = {};
+const page = () => document.getElementById("document-placeholder");
+const editOf = (doc) => (doc.editor ??= { state: newState(doc.text ? docFromJSON(doc.text) : emptyDoc()), saved: null });
+
+function markModified(doc) {
+  const editor = editOf(doc);
+  const modified = !editor.state.doc.eq(editor.saved ?? emptyDoc());
+  if (modified === !!doc.modified) return;
+  doc.modified = modified;
+  document.dispatchEvent(new CustomEvent("edukors:document-modified", { detail: { id: doc.id } }));
+}
+
+function readFormat(state) {
+  Object.assign(format, {
+    blockStyle: blockStyle(state),
+    bold: markActive(state, marks.strong), italic: markActive(state, marks.em), underline: markActive(state, marks.underline), strike: markActive(state, marks.strike),
+    script: markActive(state, marks.sub) ? "sub" : markActive(state, marks.sup) ? "super" : "none",
+    fontSize: markAttr(state, marks.size, "size") ?? DEFAULT_SIZE,
+    fontFamily: markAttr(state, marks.font, "family") ?? DEFAULT_FONT,
+    color: markAttr(state, marks.color, "color") ?? "#000000",
+    align: ALIGNS.includes(state.selection.$from.parent.attrs.align) ? state.selection.$from.parent.attrs.align : "left",
+    list: listType(state),
+    link: markAttr(state, marks.link, "href") || "",
+  });
+}
+
+function onFormat(property, value) {
+  if (!view) return;
+  const run = (command) => command(view.state, view.dispatch);
+  const toggle = { bold: marks.strong, italic: marks.em, underline: marks.underline, strike: marks.strike };
+  if (toggle[property]) {
+    const type = toggle[property];
+    run(value ? setMark(type, {}) : setMark(type, null));
+  } else if (property === "script") {
+    run(setMark(marks.sub, null)); run(setMark(marks.sup, null));
+    if (value === "sub" || value === "super") run(setMark(value === "sub" ? marks.sub : marks.sup, {}));
+  } else if (property === "fontSize") run(setMark(marks.size, value === DEFAULT_SIZE ? null : { size: Math.min(SIZE_RANGE.max, Math.max(SIZE_RANGE.min, value)) }));
+  else if (property === "fontFamily") run(setMark(marks.font, value === DEFAULT_FONT ? null : { family: value }));
+  else if (property === "color") run(setMark(marks.color, value === "#000000" ? null : { color: value }));
+  else if (property === "align") run(setAlign(value));
+  else if (property === "list") applyList(view, value);
+  else if (property === "blockStyle") applyBlockStyle(view, value);
+  else if (property === "link") applyLink(view, value);
+  view.focus();
+}
+
+function renderToolbar() {
+  const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
+  if (!view) { slot.classList.remove("is-open", "is-settled"); slot.inert = true; toolbar = null; bar.replaceChildren(); return; }
+  readFormat(view.state);
+  if (!toolbar) {
+    bar.setAttribute("aria-label", t("contextToolbar"));
+    toolbar = EdukorsFormat.render(bar, {
+      groups: ["blockStyle", "text", "align", "lists", "link"], state: format, t, onChange: onFormat,
+      options: { fontSizes: FONT_SIZES, fontFamilies: FONT_FAMILIES, fontSizeRange: { ...SIZE_RANGE, step: 0.5 }, linkQr: false },
+    });
+    slot.classList.add("is-open", "is-settled");
+    slot.inert = false;
+  } else toolbar.refresh();
+}
+
+// The shell's Edit buttons: available when they can act; their clicks run here.
+const EDIT = ["undo", "redo", "cut", "copy", "paste", "delete"];
+const editButton = (key) => document.querySelector(`#edit-actions [data-command="${key}"]`);
+function renderEdit() {
+  const state = view?.state;
+  const available = state ? { undo: undoDepth(state) > 0, redo: redoDepth(state) > 0, cut: !state.selection.empty, copy: !state.selection.empty, paste: true, delete: !state.selection.empty } : {};
+  for (const key of [...EDIT, "duplicate"]) {
+    const button = editButton(key);
+    if (!button) continue;
+    if (available[key]) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true");
+  }
+}
+async function runEdit(key) {
+  if (!view) return;
+  view.focus();
+  if (key === "undo") undo(view.state, view.dispatch);
+  else if (key === "redo") redo(view.state, view.dispatch);
+  else if (key === "delete") deleteSelection(view.state, view.dispatch);
+  else if (key === "cut" || key === "copy") document.execCommand(key);
+  else if (key === "paste") {
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        if (item.types.includes("text/html")) { view.pasteHTML(await (await item.getType("text/html")).text()); return; }
+        if (item.types.includes("text/plain")) { view.pasteText(await (await item.getType("text/plain")).text()); return; }
+      }
+    } catch { /* the clipboard could not be read: nothing to paste */ }
+  }
+}
+for (const key of EDIT) editButton(key)?.addEventListener("click", () => runEdit(key));
+
+// The formatting bar lies over the top of the document area (Common's contextual toolbar); the page scrolls below it,
+// so nothing is hidden behind the bar, also when it wraps onto two rows.
+const fitBelowBar = new ResizeObserver(() => {
+  const body = document.querySelector(".document-body"), bar = document.getElementById("context-toolbar");
+  if (body) body.style.marginTop = view ? `${bar.offsetHeight}px` : "";
+});
+fitBelowBar.observe(document.getElementById("context-toolbar"));
+
+function show(doc) {
+  const host = page();
+  if (!doc) {
+    view?.destroy(); view = null; active = null; renderToolbar(); renderEdit();
+    document.querySelector(".workspace")?.classList.remove("text-workspace");
+    document.querySelector(".document-body").style.marginTop = "";
+    return;
+  }
+  const editor = editOf(doc);
+  editor.saved ??= editor.state.doc;
+  active = doc;
+  host.classList.add("text-page");
+  document.querySelector(".workspace")?.classList.add("text-workspace");
+  if (!view) {
+    host.replaceChildren();
+    view = new EditorView(host, {
+      state: editor.state,
+      attributes: { spellcheck: "true", "aria-label": t("fmtText") || "Text", role: "textbox", "aria-multiline": "true" },
+      dispatchTransaction(tr) {
+        const state = view.state.apply(tr);
+        view.updateState(state);
+        editOf(active).state = state;
+        if (tr.docChanged) markModified(active);
+        renderToolbar(); renderEdit();
+      },
+    });
+  } else view.updateState(editor.state);
+  renderToolbar(); renderEdit();
+  document.querySelector(".document-body").style.marginTop = `${document.getElementById("context-toolbar").offsetHeight}px`;
+}
+
+document.addEventListener("edukors:documents-changed", (event) => show(event.detail.active || null));
+// After a save, the saved content is the baseline for "modified".
+document.addEventListener("edukors:document-saved", (event) => { const doc = event.detail.doc; editOf(doc).saved = editOf(doc).state.doc; markModified(doc); });
+document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); });
+// Clicking the empty part of the page below the text puts the cursor at the end.
+document.addEventListener("mousedown", (event) => {
+  if (!view || event.target !== page()) return;
+  event.preventDefault();
+  view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)));
+  view.focus();
+});
+
+globalThis.EdukorsTextEditor = Object.freeze({
+  schema,
+  /** The content to save: the document's current state as JSON. */
+  toJSON: (doc) => (doc.editor ? doc.editor.state.doc.toJSON() : doc.text ?? emptyDoc().toJSON()),
+  /** Checks a file's content and returns it as JSON again; throws when it is not valid. */
+  check: (json) => docFromJSON(json).toJSON(),
+  empty: () => emptyDoc().toJSON(),
+  /** Gives a document opened or imported content; the next time it shows, it starts from it, with no undo history. */
+  adopt(doc, json) { doc.text = json; doc.editor = null; editOf(doc).saved = editOf(doc).state.doc; },
+  /** Selects the whole active document (the menu's Select All outside a text field). */
+  selectAll() { if (view) { view.focus(); view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 0, view.state.doc.content.size))); } },
+  /** Export and Import (src/editor/convert.js): exportDocument(json, format, title), importDocument(format, bytes). */
+  exportDocument, importDocument,
+  get view() { return view; },
+});

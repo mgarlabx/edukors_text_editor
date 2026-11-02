@@ -8,5 +8,6 @@ startDesktopApp({
   name: "Edukors Text Editor",
   root: fileURLToPath(new URL("..", import.meta.url)),
   documentExtensions: [".etex"],
-  exportFormats: [],
+  importExtensions: [".docx", ".html", ".htm", ".md", ".markdown", ".txt", ".pdf"],
+  exportFormats: ["html", "pdf", "md", "txt", "docx"],
 });

@@ -19,9 +19,10 @@
   },
   "main": "desktop/main.mjs",
   "scripts": {
-    "start": "electron .",
-    "test": "node --test",
-    "package": "node tools/package.mjs",
+    "build": "node tools/build.mjs",
+    "start": "node tools/build.mjs && electron .",
+    "test": "node tools/build.mjs && node --test",
+    "package": "node tools/build.mjs && node tools/package.mjs",
     "icons": "electron tools/raster-icons.mjs"
   },
   "edukors": {
@@ -31,7 +32,24 @@
     "edukors-common-ux": "git+https://github.com/mgarlabx/edukors_common_ux.git#main"
   },
   "devDependencies": {
+    "docx": "9.12.0",
     "electron": "44.10.0",
-    "electron-builder": "26.17.0"
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "mammoth": "1.13.0",
+    "markdown-it": "14.3.3",
+    "pdfjs-dist": "6.4.299",
+    "prosemirror-commands": "1.7.2",
+    "prosemirror-dropcursor": "1.8.4",
+    "prosemirror-gapcursor": "1.4.1",
+    "prosemirror-history": "1.5.1",
+    "prosemirror-inputrules": "1.5.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-markdown": "1.13.8",
+    "prosemirror-model": "1.25.12",
+    "prosemirror-schema-basic": "1.2.5",
+    "prosemirror-schema-list": "1.5.1",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-view": "1.42.6"
   }
 }

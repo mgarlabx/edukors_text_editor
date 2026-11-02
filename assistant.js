@@ -3,6 +3,6 @@
 EdukorsAiAssistant.configure({
   instructions: 'You are the assistant of the Edukors Text Editor. The text editor itself is not built yet, so you cannot change the document; help the person in the conversation.',
   tools: [],
-  context: doc => doc.text || EdukorsTextDocument.empty(),
+  context: doc => ({ document: EdukorsTextEditor.toJSON(doc) }),
   documentId: doc => `text-${doc.id}`
 });

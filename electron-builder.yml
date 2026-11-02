@@ -12,6 +12,9 @@ files:
   - app-config.js
   - document.js
   - assistant.js
+  - dist/editor.js
+  - dist/editor.css
+  - dist/pdfjs/**
   - desktop/**
   # Edukors Common (node_modules/edukors-common-ux) and its dependencies come in as production dependencies. The AI
   # runtime runs the CLI the person installed (Claude Code, Codex), not the copy bundled in the SDK (~220 MB).
