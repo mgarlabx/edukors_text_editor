@@ -1,0 +1,117 @@
+name: Release
+
+# A tag vX.Y.Z (package.json must hold X.Y.Z) builds, signs, and publishes the installers in a GitHub release.
+# Every release uses the latest Edukors Common (its main branch), and the tests run against it before packaging.
+# Signing secrets (environment "release"): MAC_CERT_P12 (base64 .p12, Developer ID Application), MAC_CERT_PASSWORD,
+# APPLE_API_KEY (base64 .p8), APPLE_API_KEY_ID, APPLE_API_ISSUER. Without them macOS builds are signed ad hoc.
+# Run by hand (Actions → Release → Run workflow) to build the installers without publishing.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "${GITHUB_REF_NAME#v}" != "$pkg" ]; then echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($pkg)"; exit 1; fi
+          echo "version=$pkg" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    name: build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: mac, os: macos-latest}
+          - {name: win, os: windows-latest}
+          - {name: linux, os: ubuntu-latest}
+    runs-on: ${{ matrix.os }}
+    environment: ${{ github.ref_type == 'tag' && 'release' || '' }}
+    timeout-minutes: 60
+    env:
+      HAS_MAC_CERT: ${{ secrets.MAC_CERT_P12 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Latest Edukors Common
+        run: npm install --no-save "edukors-common-ux@git+https://github.com/mgarlabx/edukors_common_ux.git#main"
+      - run: npm ls edukors-common-ux
+      - run: npm test
+      - name: Without a certificate, macOS builds are signed ad hoc (Gatekeeper will warn)
+        if: runner.os == 'macOS' && env.HAS_MAC_CERT != 'true'
+        run: echo "BUILDER_ARGS=-c.mac.identity=- -c.mac.hardenedRuntime=false" >> "$GITHUB_ENV"
+      - name: Signing and notarization credentials
+        if: runner.os == 'macOS' && env.HAS_MAC_CERT == 'true'
+        env:
+          P12: ${{ secrets.MAC_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          API_KEY: ${{ secrets.APPLE_API_KEY }}
+          API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          key="$RUNNER_TEMP/AuthKey.p8"; echo "$API_KEY" | base64 --decode > "$key"
+          { echo "CSC_LINK=$P12"; echo "CSC_KEY_PASSWORD=$P12_PASSWORD"; echo "APPLE_API_KEY=$key"
+            echo "APPLE_API_KEY_ID=$API_KEY_ID"; echo "APPLE_API_ISSUER=$API_ISSUER"; } >> "$GITHUB_ENV"
+      - name: Package
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.HAS_MAC_CERT == 'true' }}
+        run: node tools/package.mjs $BUILDER_ARGS
+      - name: Check signature and notarization
+        if: runner.os == 'macOS' && env.HAS_MAC_CERT == 'true'
+        run: |
+          mnt=$(mktemp -d); hdiutil attach -nobrowse -readonly -mountpoint "$mnt" release/*.dmg
+          app="$mnt/Edukors Text Editor.app"
+          codesign --verify --deep --strict "$app" && xcrun stapler validate "$app" && spctl -a -vv -t exec "$app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.name }}
+          path: |
+            release/*.dmg
+            release/*.AppImage
+          if-no-files-found: ignore
+          retention-days: 7
+      # The MSIX goes to the Microsoft Store (by hand until the app is reserved in Partner Center), not to the release.
+      - name: Microsoft Store package
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-msix
+          path: release/*.msix
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [check, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: build-*
+          path: files
+          merge-multiple: true
+      - name: Checksums
+        working-directory: files
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" files/* -R "$GITHUB_REPOSITORY" --verify-tag --title "Edukors Text Editor ${{ needs.check.outputs.version }}" --generate-notes

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Edukors Text Editor: a page of text. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f8ef0"/><stop offset="1" stop-color="#2a5fc9"/></linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+  <rect x="292" y="212" width="440" height="600" rx="36" fill="#fff"/>
+  <rect x="352" y="282" width="220" height="34" rx="17" fill="#2a5fc9"/>
+  <rect x="352" y="360" width="320" height="20" rx="10" fill="#c5d6f6"/>
+  <rect x="352" y="404" width="320" height="20" rx="10" fill="#c5d6f6"/>
+  <rect x="352" y="448" width="260" height="20" rx="10" fill="#c5d6f6"/>
+  <rect x="352" y="516" width="320" height="20" rx="10" fill="#c5d6f6"/>
+  <rect x="352" y="560" width="320" height="20" rx="10" fill="#c5d6f6"/>
+  <rect x="352" y="604" width="200" height="20" rx="10" fill="#c5d6f6"/>
+  <rect x="352" y="672" width="300" height="20" rx="10" fill="#c5d6f6"/>
+</svg>

@@ -1,0 +1,37 @@
+{
+  "name": "edukors-text-editor",
+  "productName": "Edukors Text Editor",
+  "version": "26.11.2",
+  "private": true,
+  "description": "Edukors Text Editor, built on Edukors Common.",
+  "author": {
+    "name": "Edukors",
+    "url": "https://edukors.org"
+  },
+  "homepage": "https://github.com/mgarlabx/edukors_text_editor",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mgarlabx/edukors_text_editor.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "main": "desktop/main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "package": "node tools/package.mjs",
+    "icons": "electron tools/raster-icons.mjs"
+  },
+  "edukors": {
+    "updates": "mgarlabx/edukors_text_editor"
+  },
+  "dependencies": {
+    "edukors-common-ux": "git+https://github.com/mgarlabx/edukors_common_ux.git#main"
+  },
+  "devDependencies": {
+    "electron": "44.10.0",
+    "electron-builder": "26.17.0"
+  }
+}
