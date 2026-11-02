@@ -43,6 +43,12 @@
 .text-page .page-break { position: absolute; left: 0; right: 0; border-top: 1px dashed #b4bccd; }
 .text-page .page-break::after { content: attr(data-label); position: absolute; right: 8px; top: 3px; color: #8a93a8; font: 500 10px/1 Arial, sans-serif; letter-spacing: .02em; }
 
+/* The bubble under a link at the cursor (src/editor/index.js): the address, which opens it, and the shortcut. */
+.link-bubble { position: fixed; z-index: 40; display: flex; align-items: center; gap: 10px; max-width: min(460px, calc(100vw - 16px)); padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--icon); box-shadow: 0 6px 20px #17213b26; font-size: calc(12px * var(--font-scale)); }
+.link-bubble a { overflow: hidden; color: var(--accent); text-overflow: ellipsis; white-space: nowrap; }
+.link-bubble span { flex-shrink: 0; }
+.text-page a { cursor: text; }
+
 /* The bar: Common's groups, then the page-break switch at the end. */
 .context-toolbar .text-format-groups { display: contents; }
 .context-toolbar .text-view-group { margin-left: auto; }

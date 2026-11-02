@@ -17,6 +17,7 @@ import { schema, emptyDoc, docFromJSON, ALIGNS, DEFAULT_FONT, DEFAULT_SIZE, SIZE
 import { exportDocument, importDocument } from "./convert.js";
 import { nodeViews, insertShape, insertImageFromFile } from "./media.js";
 import { renderPageBreaks } from "./pages.js";
+import * as ai from "./ai.js";
 import { media } from "./schema.js";
 
 const { nodes, marks } = schema;
@@ -248,6 +249,40 @@ function renderToolbar() {
   } else toolbar.refresh();
 }
 
+// ---------- Links ----------
+// The text is always editable, so a plain click places the cursor. With the cursor in a link, a bubble under it shows
+// the address, which opens it; Cmd+click (Ctrl+click on Windows and Linux) opens a link at once. Links open in the
+// system's browser or mail program (the desktop host allows only http, https, and mailto).
+const openLink = (href) => window.open(href, "_blank", "noopener");
+let bubble = null;
+function linkAtSelection(state) {
+  const { empty, $from } = state.selection;
+  if (!empty) return null;
+  const mark = marks.link.isInSet(state.storedMarks || $from.marks()) || ($from.nodeAfter && marks.link.isInSet($from.nodeAfter.marks));
+  return mark ? mark.attrs.href : null;
+}
+function renderBubble() {
+  const href = view && view.hasFocus() ? linkAtSelection(view.state) : null;
+  if (!href) { bubble?.remove(); bubble = null; return; }
+  if (!bubble) {
+    bubble = document.createElement("div");
+    bubble.className = "link-bubble";
+    bubble.setAttribute("role", "tooltip");
+    bubble.addEventListener("mousedown", (event) => event.preventDefault()); // keep the cursor in the text
+    document.body.append(bubble);
+  }
+  const link = document.createElement("a");
+  link.href = href;
+  link.textContent = href.replace(/^mailto:/, "");
+  link.addEventListener("click", (event) => { event.preventDefault(); openLink(href); });
+  const hint = document.createElement("span");
+  hint.textContent = t("linkOpenHint").replace("{key}", mac ? "⌘" : "Ctrl");
+  bubble.replaceChildren(link, hint);
+  const at = view.coordsAtPos(view.state.selection.from);
+  bubble.style.left = `${Math.max(8, Math.min(at.left - 12, innerWidth - bubble.offsetWidth - 8))}px`;
+  bubble.style.top = `${at.bottom + 6}px`;
+}
+
 // The shell's Edit buttons: available when they can act; their clicks run here.
 const EDIT = ["undo", "redo", "cut", "copy", "paste", "delete"];
 const editButton = (key) => document.querySelector(`#edit-actions [data-command="${key}"]`);
@@ -306,7 +341,7 @@ fitBelowBar.observe(document.getElementById("context-toolbar"));
 function show(doc) {
   const host = page();
   if (!doc) {
-    view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert();
+    view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert(); renderBubble();
     renderPageBreaks(host, null, false);
     document.querySelector(".workspace")?.classList.remove("text-workspace");
     document.querySelector(".document-body").style.marginTop = "";
@@ -322,13 +357,21 @@ function show(doc) {
     view = new EditorView(host, {
       state: editor.state,
       nodeViews,
+      handleClick(clicked, pos, event) {
+        if (!(mac ? event.metaKey : event.ctrlKey)) return false;
+        const $pos = clicked.state.doc.resolve(pos), mark = marks.link.isInSet($pos.marks()) || ($pos.nodeAfter && marks.link.isInSet($pos.nodeAfter.marks));
+        if (!mark) return false;
+        openLink(mark.attrs.href);
+        return true;
+      },
+      handleDOMEvents: { blur: () => { setTimeout(renderBubble, 0); return false; }, focus: () => { setTimeout(renderBubble, 0); return false; } },
       attributes: { spellcheck: "true", "aria-label": t("fmtText") || "Text", role: "textbox", "aria-multiline": "true" },
       dispatchTransaction(tr) {
         const state = view.state.apply(tr);
         view.updateState(state);
         editOf(active).state = state;
         if (tr.docChanged) markModified(active);
-        renderToolbar(); renderEdit();
+        renderToolbar(); renderEdit(); renderBubble();
         if (tr.docChanged) renderBreaks();
       },
     });
@@ -340,6 +383,8 @@ function show(doc) {
 }
 
 document.addEventListener("edukors:documents-changed", (event) => show(event.detail.active || null));
+document.addEventListener("scroll", () => renderBubble(), true);
+addEventListener("resize", () => renderBubble());
 // After a save, the saved content is the baseline for "modified".
 document.addEventListener("edukors:document-saved", (event) => { const doc = event.detail.doc; editOf(doc).saved = editOf(doc).state.doc; markModified(doc); });
 document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); });
@@ -364,6 +409,22 @@ globalThis.EdukorsTextEditor = Object.freeze({
   selectAll() { if (view) { view.focus(); view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 0, view.state.doc.content.size))); } },
   /** Export and Import (src/editor/convert.js): exportDocument(json, format, title), importDocument(format, bytes). */
   exportDocument, importDocument,
+  /**
+   * The AI assistant's operations (src/editor/ai.js), on the document its conversation belongs to, active or not:
+   * read(doc) and change(doc, name, args) → result; each change is one undo step of that document.
+   */
+  ai: {
+    read: (doc) => ai.readDocument(editOf(doc).state),
+    change(doc, name, args) {
+      const operation = { insert_content: ai.insertContent, replace_blocks: ai.replaceBlocks, set_block_style: ai.setBlockStyle, format_text: ai.formatText,
+        replace_text: ai.replaceText, insert_shape: ai.insertShape, insert_image: ai.insertImage }[name];
+      if (!operation) throw new Error(`Unknown change "${name}".`);
+      const editor = editOf(doc), { tr, result } = operation(editor.state, args);
+      if (doc === active && view) view.dispatch(tr);
+      else { editor.state = editor.state.apply(tr); markModified(doc); }
+      return result;
+    },
+  },
   /** The pictures of all open documents (key → { blob, url }); document.js saves and opens them as package parts. */
   media,
   get view() { return view; },
