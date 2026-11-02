@@ -4,8 +4,8 @@ globalThis.EdukorsAppConfig = {
   version: 'v.26.11.02',            // the release date; package.json holds the same date as 26.11.2
   // Version of the terms of use below. The app asks once per version; change it when the terms change.
   termsVersion: '2026-11-02',
-  // Insert group of the main toolbar: shapes (Common's catalog) and pictures.
-  insert: ['shape', 'image'],
+  // Insert group of the main toolbar: tables, shapes (Common's catalog), and pictures.
+  insert: ['table', 'shape', 'image'],
   // Documents are .etex packages (docs/document-package.md in Common). Export offers these formats in this order (the
   // first is preselected); import reads the same ones, and a PDF gives its text only. The desktop host accepts only the
   // extensions desktop/main.mjs lists.

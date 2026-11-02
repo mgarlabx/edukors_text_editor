@@ -5,13 +5,14 @@
 //
 // Everything imported goes through the document schema (src/editor/schema.js), so only what a document may contain
 // is kept: scripts, styles, event attributes, unsafe links, and unknown elements are dropped. Pictures come in when
-// they are inside the file (DOCX, or data: URLs in HTML); pictures on the web are not fetched. Tables are not part of
-// documents yet: a table's cells become paragraphs. Markdown and plain text leave pictures and shapes out.
+// they are inside the file (DOCX, or data: URLs in HTML); pictures on the web are not fetched. Tables go everywhere:
+// HTML and PDF as tables, DOCX as Word tables, Markdown as GitHub tables (one line per row; merged cells repeat empty
+// cells), plain text with tabs between cells. Markdown and plain text leave pictures and shapes out.
 // Shapes go to HTML and PDF as SVG and to DOCX as pictures.
 import { DOMParser as SchemaParser, DOMSerializer } from "prosemirror-model";
 import { MarkdownParser, MarkdownSerializer, defaultMarkdownParser, defaultMarkdownSerializer } from "prosemirror-markdown";
 import MarkdownIt from "markdown-it";
-import { AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, LevelFormat, Packer, Paragraph, TextRun } from "docx";
+import { AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun, LevelFormat, Packer, Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
 import mammoth from "mammoth/mammoth.browser.js";
 import { schema, docFromJSON, safeHref, media, DEFAULT_FONT, DEFAULT_SIZE } from "./schema.js";
 
@@ -30,6 +31,7 @@ h1:first-child,h2:first-child,h3:first-child,p:first-child{margin-top:0}
 blockquote{margin:0 0 8pt;padding:2pt 0 2pt 14pt;border-left:3pt solid #c9cdd8;color:#3c4252}
 pre{margin:0 0 8pt;padding:8pt 10pt;border-radius:4px;background:#f3f4f7;font:10.5pt/1.45 "Courier New",monospace;white-space:pre-wrap}
 code{padding:0 2pt;border-radius:3px;background:#f3f4f7;font-family:"Courier New",monospace;font-size:.92em}pre code{padding:0;background:none}
+table{width:100%;margin:0 0 8pt;border-collapse:collapse;table-layout:fixed}td,th{padding:4pt 6pt;border:1px solid #b4bccd;vertical-align:top;text-align:left}th{background:#f3f4f7}td>:last-child,th>:last-child{margin-bottom:0}tr{break-inside:avoid}
 figure{margin:0 0 8pt;line-height:0}figure img,figure svg{max-width:100%;height:auto}li,figure{break-inside:avoid}
 ul,ol{margin:0 0 8pt;padding-left:24pt}li>p{margin-bottom:2pt}a{color:#1155cc}hr{margin:12pt 0;border:0;border-top:1px solid #c9cdd8}
 h1,h2,h3{break-after:avoid}li,blockquote,pre{break-inside:avoid}`;
@@ -59,7 +61,17 @@ export function fromHTML(html) {
 }
 
 // ---------- Markdown ----------
-const markdownIt = MarkdownIt("commonmark", { html: false }).enable("strikethrough");
+const markdownIt = MarkdownIt("commonmark", { html: false }).enable(["strikethrough", "table"]);
+// A table cell holds blocks in documents but only inline text in Markdown: each cell's text becomes a paragraph.
+markdownIt.core.ruler.push("edukors_table_cells", (state) => {
+  const out = [];
+  for (const token of state.tokens) {
+    if (token.type === "th_close" || token.type === "td_close") out.push(new state.Token("paragraph_close", "p", -1));
+    out.push(token);
+    if (token.type === "th_open" || token.type === "td_open") out.push(new state.Token("paragraph_open", "p", 1));
+  }
+  state.tokens = out;
+});
 // Links Markdown allows but documents do not (relative paths, other schemes) keep their text without the link.
 markdownIt.core.ruler.push("edukors_safe_links", (state) => {
   for (const block of state.tokens) {
@@ -82,16 +94,29 @@ const markdownParser = new MarkdownParser(schema, markdownIt, {
   link: { mark: "link", getAttrs: (token) => ({ href: token.attrGet("href") }) },
   image: { ignore: true, noCloseToken: true },
   s: { mark: "strike" },
+  table: { block: "table" }, thead: { ignore: true }, tbody: { ignore: true }, tr: { block: "table_row" },
+  th: { block: "table_header" }, td: { block: "table_cell" },
 });
 export const fromMarkdown = (text) => markdownParser.parse(String(text));
 
 const plain = { open: "", close: "", mixable: true };
+// A cell's content on one line of a GitHub table (its blocks joined, pipes escaped).
+const cellMarkdown = (cell) => markdownSerializer.serialize(nodes.doc.create(null, cell.content)).trim().replace(/\s*\n+\s*/g, " ").replace(/\|/g, "\\|");
+function tableMarkdown(state, node) {
+  const rows = [];
+  node.forEach((row) => { const cells = []; row.forEach((cell) => { cells.push(cellMarkdown(cell)); for (let i = 1; i < cell.attrs.colspan; i++) cells.push(""); }); rows.push(cells); });
+  const cols = Math.max(...rows.map((cells) => cells.length));
+  const line = (cells) => `| ${Array.from({ length: cols }, (_, i) => cells[i] ?? "").join(" | ")} |`;
+  // Markdown tables always have a header row: the first row is it.
+  [line(rows[0]), `|${" --- |".repeat(cols)}`, ...rows.slice(1).map(line)].forEach((text) => { state.write(text); state.ensureNewLine(); });
+  state.closeBlock(node);
+}
 const markdownSerializer = new MarkdownSerializer(
-  { ...defaultMarkdownSerializer.nodes, image: (state, node) => state.closeBlock(node), shape: (state, node) => state.closeBlock(node) },
+  { ...defaultMarkdownSerializer.nodes, image: (state, node) => state.closeBlock(node), shape: (state, node) => state.closeBlock(node), table: tableMarkdown },
   { ...defaultMarkdownSerializer.marks, strike: { open: "~~", close: "~~", mixable: true, expelEnclosingWhitespace: true },
     underline: plain, sub: plain, sup: plain, font: plain, size: plain, color: plain },
 );
-export const toMarkdown = (doc) => `${markdownSerializer.serialize(doc, { tightLists: true })}\n`;
+export const toMarkdown = (doc) => `${markdownSerializer.serialize(doc, { tightLists: true }).replace(/\n+$/, "")}\n`;
 
 // ---------- Plain text ----------
 export function toText(doc) {
@@ -112,6 +137,12 @@ export function toText(doc) {
   const walk = (node, indent = "", quote = "") => {
     node.forEach((child) => {
       if (child.type === nodes.image || child.type === nodes.shape) return; // pictures and shapes have no text
+      if (child.type === nodes.table) { // one line per row, cells separated by tabs
+        const rows = [];
+        child.forEach((row) => { const cells = []; row.forEach((cell) => cells.push(cell.textBetween(0, cell.content.size, " ", " "))); rows.push(`${quote}${indent}${cells.join("\t")}`); });
+        blocks.push(rows.join("\n"));
+        return;
+      }
       if (isList(child)) list(child, indent, quote);
       else if (child.type === nodes.blockquote) walk(child, indent, `${quote}> `);
       else if (child.type === nodes.horizontal_rule) blocks.push(`${quote}${"—".repeat(12)}`);
@@ -199,9 +230,9 @@ async function docxPictures(doc) {
 }
 
 function docxBlocks(doc, pictures = new Map()) {
-  const out = [];
+  const all = [];
   let listInstance = 0;
-  const walk = (node, context) => {
+  const walk = (node, context, out = all) => {
     node.forEach((child) => {
       // Quotes and code use the paragraph styles "Quote" and "Code", which Word shows and the import reads back.
       const base = { alignment: ALIGN[child.attrs?.align], style: context.quote ? "Quote" : undefined };
@@ -210,24 +241,49 @@ function docxBlocks(doc, pictures = new Map()) {
       else if (child.type === nodes.code_block) {
         child.textContent.split("\n").forEach((line) => out.push(new Paragraph({ ...base, style: "Code", children: [new TextRun(line)] })));
       } else if (child.type === nodes.horizontal_rule) out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "C9CDD8", space: 1 } } }));
+      else if (child.type === nodes.table) out.push(docxTable(child, (cell) => { const inner = []; walk(cell, {}, inner); return inner; }));
       else if (child.type === nodes.image || child.type === nodes.shape) {
         const picture = pictures.get(child);
         if (picture) out.push(new Paragraph({ alignment: ALIGN[child.attrs.align], children: [new ImageRun({ type: picture.type, data: picture.data, transformation: { width: picture.width, height: picture.height },
           altText: { name: child.type === nodes.image ? "Picture" : "Shape", title: child.attrs.alt || "", description: child.attrs.alt || "" } })] }));
       }
-      else if (child.type === nodes.blockquote) walk(child, { ...context, quote: true });
+      else if (child.type === nodes.blockquote) walk(child, { ...context, quote: true }, out);
       else if (child.type === nodes.bullet_list || child.type === nodes.ordered_list) {
         const level = (context.level ?? -1) + 1, reference = child.type === nodes.bullet_list ? "bullets" : "numbers", instance = ++listInstance;
         child.forEach((item) => {
           let first = true;
           // The first paragraph of an item carries the bullet or number; the item's other paragraphs are indented only.
-          walk(item, { ...context, level, numbering: () => { if (!first) return undefined; first = false; return { reference, level: Math.min(level, 8), instance }; } });
+          walk(item, { ...context, level, numbering: () => { if (!first) return undefined; first = false; return { reference, level: Math.min(level, 8), instance }; } }, out);
         });
       }
     });
   };
   walk(doc, {});
-  return out;
+  return all;
+}
+
+// A Word table over the text width (170 mm = 9638 twips): column widths from the editor's (pixels) or equal; header
+// cells in a repeated header row; merged cells; fills.
+function docxTable(table, blocksOf) {
+  const first = table.firstChild, columns = [];
+  first.forEach((cell) => { for (let i = 0; i < cell.attrs.colspan; i++) columns.push(cell.attrs.colwidth?.[i] || 0); });
+  const known = columns.reduce((sum, w) => sum + w, 0), unknown = columns.filter((w) => !w).length;
+  const free = Math.max(0, CONTENT_WIDTH - known) / (unknown || 1);
+  const pixels = columns.map((w) => w || free), total = pixels.reduce((sum, w) => sum + w, 0) || 1;
+  const columnWidths = pixels.map((w) => Math.round((w / total) * 9638));
+  const rows = [];
+  table.forEach((row) => {
+    const cells = [];
+    row.forEach((cell) => cells.push(new TableCell({
+      children: (() => { const blocks = blocksOf(cell); return blocks.length ? blocks : [new Paragraph("")]; })(),
+      columnSpan: cell.attrs.colspan > 1 ? cell.attrs.colspan : undefined, rowSpan: cell.attrs.rowspan > 1 ? cell.attrs.rowspan : undefined,
+      shading: cell.attrs.background ? { type: ShadingType.CLEAR, color: "auto", fill: cell.attrs.background.slice(1).toUpperCase() } : cell.type === nodes.table_header ? { type: ShadingType.CLEAR, color: "auto", fill: "F3F4F7" } : undefined,
+      margins: { top: 60, bottom: 60, left: 100, right: 100 },
+    })));
+    // Only the header row is marked (readers such as mammoth take an explicit "off" for a header too).
+    rows.push(new TableRow({ children: cells, ...(row === first && row.firstChild.type === nodes.table_header ? { tableHeader: true } : {}) }));
+  });
+  return new Table({ rows, columnWidths, width: { size: 9638, type: WidthType.DXA } });
 }
 
 const listLevels = (format, text) => Array.from({ length: 9 }, (_, level) => ({

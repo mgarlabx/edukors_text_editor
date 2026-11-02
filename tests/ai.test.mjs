@@ -75,3 +75,12 @@ test("shapes and pictures are inserted as checked blocks", () => {
   assert.throws(() => apply(state, "insertImage", { key: "../x" }), /picture/i);
   docFromJSON(state.doc.toJSON());
 });
+
+test("the assistant writes and reads tables in Markdown", () => {
+  const { state } = apply(start("Texto."), "insertContent", { markdown: "| A | B |\n| --- | --- |\n| 1 | 2 |" });
+  const { blocks } = ai.readDocument(state);
+  assert.deepEqual(blocks.map((b) => b.type), ["paragraph", "table"]);
+  assert.equal(blocks[1].markdown, "| A | B |\n| --- | --- |\n| 1 | 2 |");
+  const { state: bold } = apply(state, "formatText", { text: "2", bold: true });
+  assert.match(ai.readDocument(bold).blocks[1].markdown, /\| 1 \| \*\*2\*\* \|/);
+});

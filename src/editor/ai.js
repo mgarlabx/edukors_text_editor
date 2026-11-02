@@ -16,7 +16,7 @@ const hex = (value) => (/^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fa
 function describe(node) {
   if (node.type === nodes.image) return { type: "picture", description: node.attrs.alt, width: node.attrs.width, align: node.attrs.align };
   if (node.type === nodes.shape) { const { keepRatio, ...attrs } = node.attrs; return { type: "shape", ...attrs }; }
-  const type = node.type === nodes.heading ? `heading${node.attrs.level}` : { paragraph: "paragraph", blockquote: "quote", code_block: "code", horizontal_rule: "rule", bullet_list: "bulleted list", ordered_list: "numbered list" }[node.type.name];
+  const type = node.type === nodes.heading ? `heading${node.attrs.level}` : { paragraph: "paragraph", blockquote: "quote", code_block: "code", horizontal_rule: "rule", bullet_list: "bulleted list", ordered_list: "numbered list", table: "table" }[node.type.name];
   const markdown = toMarkdown(nodes.doc.create(null, [node])).trim();
   return { type, ...(node.attrs.align ? { align: node.attrs.align } : {}), markdown };
 }

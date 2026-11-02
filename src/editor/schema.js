@@ -4,13 +4,15 @@
 // Blocks: paragraph and heading (levels 1–3), both with an optional alignment; blockquote; code block; horizontal rule;
 // bulleted and numbered lists; image and shape (between paragraphs, aligned left, center, or right). Inline: text and
 // hard breaks. Marks: bold, italic, underline, strikethrough, subscript or superscript, inline code, link (http, https,
-// mailto), font family, font size (points), and color. Tables come later.
+// mailto), font family, font size (points), and color. Tables (prosemirror-tables): rows of cells and header cells, each
+// with blocks inside, merged cells (colspan, rowspan), column widths, and a fill color.
 //
 // Pictures live in `media` (a key per picture, its Blob, and an object URL to show it); a document names them by key.
 // The file keeps them as package parts (document.js).
 import { Schema } from "prosemirror-model";
 import { schema as basic, marks as basicMarks } from "prosemirror-schema-basic";
 import { addListNodes } from "prosemirror-schema-list";
+import { tableNodes } from "prosemirror-tables";
 
 export const ALIGNS = ["left", "center", "right", "justify"];
 export const DEFAULT_FONT = "Arial";
@@ -192,8 +194,28 @@ export function cssColorToHex(value) {
   return rgb ? `#${rgb.slice(1, 4).map((n) => Math.min(255, Number(n)).toString(16).padStart(2, "0")).join("")}` : null;
 }
 
+// Tables, with every cell attribute validated (spans, widths, and the fill go into the HTML the editor shows).
+const tables = tableNodes({
+  tableGroup: "block", cellContent: "block+",
+  cellAttributes: {
+    background: {
+      default: null,
+      getFromDOM: (dom) => cssColorToHex(dom.style.backgroundColor),
+      setDOMAttr: (value, attrs) => { if (value) attrs.style = `${attrs.style || ""}background-color: ${value};`; },
+    },
+  },
+});
+const span = (v) => (Number.isInteger(v) && v >= 1 && v <= 100 ? v : fail("cell span"));
+for (const name of ["table_cell", "table_header"]) {
+  const attrs = tables[name].attrs;
+  attrs.colspan.validate = span;
+  attrs.rowspan.validate = span;
+  attrs.colwidth.validate = (v) => (v === null || (Array.isArray(v) && v.length <= 100 && v.every((w) => w === 0 || (Number.isFinite(w) && w >= 10 && w <= 2000))) ? v : fail("column width"));
+  attrs.background.validate = (v) => (v === null || hexColor(v) === v ? v : fail("cell fill"));
+}
+
 export const schema = new Schema({
-  nodes: addListNodes(nodes, "paragraph block*", "block"),
+  nodes: addListNodes(nodes, "paragraph block*", "block").append(tables),
   marks: markSpecs,
 });
 

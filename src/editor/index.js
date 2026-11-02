@@ -18,6 +18,9 @@ import { exportDocument, importDocument } from "./convert.js";
 import { nodeViews, insertShape, insertImageFromFile } from "./media.js";
 import { renderPageBreaks } from "./pages.js";
 import * as ai from "./ai.js";
+import { columnResizing, tableEditing, goToNextCell, isInTable, selectionCell, setCellAttr, addRowBefore, addRowAfter, addColumnBefore, addColumnAfter,
+  deleteRow, deleteColumn, mergeCells, splitCell, toggleHeaderRow, deleteTable } from "prosemirror-tables";
+import { pickTableSize, insertTable } from "./tables.js";
 import { media } from "./schema.js";
 
 const { nodes, marks } = schema;
@@ -28,17 +31,17 @@ const FONT_FAMILIES = ["Arial", "Calibri", "Cambria", "Georgia", "Helvetica", "T
 // ---------- Commands ----------
 // A mark is shown as active when the whole selection has it (or, with no selection, the typing position).
 const markActive = (state, type) => {
-  const { from, $from, to, empty } = state.selection;
+  const { $from, empty, ranges } = state.selection;
   if (empty) return !!type.isInSet(state.storedMarks || $from.marks());
   let all = true, any = false;
-  state.doc.nodesBetween(from, to, (node) => { if (node.isText) { any = true; if (!type.isInSet(node.marks)) all = false; } });
+  for (const range of ranges) state.doc.nodesBetween(range.$from.pos, range.$to.pos, (node) => { if (node.isText) { any = true; if (!type.isInSet(node.marks)) all = false; } });
   return any && all;
 };
 const markAttr = (state, type, attr) => {
-  const { from, to, empty, $from } = state.selection;
+  const { empty, $from, ranges } = state.selection;
   if (empty) return type.isInSet(state.storedMarks || $from.marks())?.attrs[attr];
   let value; let mixed = false;
-  state.doc.nodesBetween(from, to, (node) => {
+  for (const range of ranges) state.doc.nodesBetween(range.$from.pos, range.$to.pos, (node) => {
     if (!node.isText) return;
     const found = type.isInSet(node.marks)?.attrs[attr];
     if (value === undefined) value = found ?? null; else if (value !== (found ?? null)) mixed = true;
@@ -47,19 +50,18 @@ const markAttr = (state, type, attr) => {
 };
 // Sets a mark with attributes on the selection (or for the next typing when the selection is empty); null removes it.
 const setMark = (type, attrs) => (state, dispatch) => {
-  const { from, to, empty } = state.selection;
+  const { empty, ranges } = state.selection;
   if (dispatch) {
     const tr = state.tr;
     if (empty) { tr.removeStoredMark(type); if (attrs) tr.addStoredMark(type.create(attrs)); }
-    else { tr.removeMark(from, to, type); if (attrs) tr.addMark(from, to, type.create(attrs)); }
+    else for (const { $from, $to } of ranges) { tr.removeMark($from.pos, $to.pos, type); if (attrs) tr.addMark($from.pos, $to.pos, type.create(attrs)); }
     dispatch(tr.scrollIntoView());
   }
   return true;
 };
 const setAlign = (align) => (state, dispatch) => {
-  const { from, to } = state.selection;
   const tr = state.tr;
-  state.doc.nodesBetween(from, to, (node, pos) => {
+  for (const { $from, $to } of state.selection.ranges) state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
     if (node.type === nodes.paragraph || node.type === nodes.heading) tr.setNodeMarkup(pos, null, { ...node.attrs, align: align === "left" ? null : align });
   });
   if (dispatch) dispatch(tr);
@@ -127,13 +129,14 @@ function keys() {
     "Mod-z": undo, "Shift-Mod-z": redo, "Mod-b": toggleMark(marks.strong), "Mod-i": toggleMark(marks.em), "Mod-u": toggleMark(marks.underline),
     "Mod-Shift-x": toggleMark(marks.strike), "Mod-e": toggleMark(marks.code), "Mod-.": toggleMark(marks.sup), "Mod-,": toggleMark(marks.sub),
     "Shift-Enter": chainCommands(exitCode, (state, dispatch) => { if (dispatch) dispatch(state.tr.replaceSelectionWith(nodes.hard_break.create()).scrollIntoView()); return true; }),
-    Enter: splitListItem(nodes.list_item), Tab: sinkListItem(nodes.list_item), "Shift-Tab": liftListItem(nodes.list_item),
+    // In a table, Tab and Shift+Tab move between cells; in a list they change the level.
+    Enter: splitListItem(nodes.list_item), Tab: chainCommands(goToNextCell(1), sinkListItem(nodes.list_item)), "Shift-Tab": chainCommands(goToNextCell(-1), liftListItem(nodes.list_item)),
     "Mod-Alt-0": setBlockType(nodes.paragraph), "Mod-Alt-1": setBlockType(nodes.heading, { level: 1 }), "Mod-Alt-2": setBlockType(nodes.heading, { level: 2 }), "Mod-Alt-3": setBlockType(nodes.heading, { level: 3 }),
   };
   if (!mac) map["Mod-y"] = redo;
   return [keymap(map), keymap(baseKeymap)];
 }
-const plugins = () => [rules(), ...keys(), history(), dropCursor(), gapCursor()];
+const plugins = () => [columnResizing(), tableEditing(), rules(), ...keys(), history(), dropCursor(), gapCursor()];
 const newState = (doc) => EditorState.create({ schema, doc, plugins: plugins() });
 
 // ---------- The surface ----------
@@ -153,7 +156,10 @@ function markModified(doc) {
 
 // What the selection is: a picture, a shape, or text. The format bar shows the groups for it.
 const kindOf = (state) => (state.selection instanceof NodeSelection && (state.selection.node.type === nodes.image || state.selection.node.type === nodes.shape) ? state.selection.node.type.name : "text");
-const GROUPS = { text: ["blockStyle", "text", "align", "lists", "link"], image: ["align"], shape: ["shape", "align"] };
+const GROUPS = { text: ["blockStyle", "text", "align", "lists", "link"], table: ["blockStyle", "text", "align", "lists", "link", "table"], image: ["align"], shape: ["shape", "align"] };
+const TABLE_ACTIONS = { addRowBefore, addRowAfter, addColumnBefore, addColumnAfter, deleteRow, deleteColumn, mergeCells, splitCell, toggleHeaderRow, deleteTable };
+// The format bar's kind: a picture, a shape, text in a table (adds the table group), or text.
+const barKind = (state) => { const kind = kindOf(state); return kind === "text" && isInTable(state) ? "table" : kind; };
 
 function readFormat(state) {
   if (kindOf(state) !== "text") { Object.assign(format, state.selection.node.attrs); return; }
@@ -167,6 +173,7 @@ function readFormat(state) {
     align: ALIGNS.includes(state.selection.$from.parent.attrs.align) ? state.selection.$from.parent.attrs.align : "left",
     list: listType(state),
     link: markAttr(state, marks.link, "href") || "",
+    cellFill: isInTable(state) ? selectionCell(state)?.nodeAfter?.attrs.background || "transparent" : "transparent",
   });
 }
 
@@ -197,6 +204,8 @@ function onFormat(property, value) {
   else if (property === "list") applyList(view, value);
   else if (property === "blockStyle") applyBlockStyle(view, value);
   else if (property === "link") applyLink(view, value);
+  else if (property === "tableAction") TABLE_ACTIONS[value]?.(view.state, view.dispatch);
+  else if (property === "cellFill") run(setCellAttr("background", value === "transparent" ? null : value));
   view.focus();
 }
 
@@ -228,7 +237,7 @@ let toolbarKind = null;
 function renderToolbar() {
   const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
   if (!view) { slot.classList.remove("is-open", "is-settled"); slot.inert = true; toolbar = null; toolbarKind = null; bar.replaceChildren(); return; }
-  const kind = kindOf(view.state);
+  const kind = barKind(view.state);
   readFormat(view.state);
   if (!toolbar || kind !== toolbarKind) {
     bar.setAttribute("aria-label", t("contextToolbar"));
@@ -315,6 +324,11 @@ for (const key of EDIT) editButton(key)?.addEventListener("click", () => runEdit
 
 // Insert: a shape from Common's picker, under the button; a picture from a file.
 const insertButton = (key) => document.querySelector(`#insert-actions [data-command="${key}"]`);
+insertButton("insertTable")?.addEventListener("click", () => {
+  if (!view) return;
+  const anchor = insertButton("insertTable").getBoundingClientRect(), target = view;
+  pickTableSize({ x: anchor.left, y: anchor.bottom + 6, t, restoreFocus: view.dom, onPick: (rows, cols) => { if (view === target) insertTable(view, rows, cols); } });
+});
 insertButton("insertShape")?.addEventListener("click", () => {
   if (!view) return;
   const anchor = insertButton("insertShape").getBoundingClientRect(), target = view;
@@ -324,7 +338,7 @@ insertButton("insertImage")?.addEventListener("click", () => {
   if (view) insertImageFromFile(view, (name) => EdukorsFileDialogs.toast({ t, message: EdukorsFileDialogs.fill(t("importFailed"), { name, reason: t("importNotImage") }) }));
 });
 function renderInsert() {
-  for (const key of ["insertShape", "insertImage"]) {
+  for (const key of ["insertTable", "insertShape", "insertImage"]) {
     const button = insertButton(key);
     if (button) { if (view) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true"); }
   }

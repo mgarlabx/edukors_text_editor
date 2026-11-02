@@ -60,3 +60,16 @@ test("DOCX: Word-readable, with headings, emphasis, links, and lists", async () 
   assert.match(html, /<ol><li>luz<\/li><li>água<\/li><\/ol>/);
   assert.deepEqual(Object.keys(await exportDocument(sample.toJSON(), "docx", "Aula")), ["data"]);
 });
+
+test("tables: GitHub Markdown out and back, tabs in text, Word tables in DOCX", async () => {
+  const doc = fromMarkdown("| Parte | Função |\n| --- | --- |\n| **Folha** | fotossíntese |\n| Raiz | absorção \\| água |\n");
+  const table = doc.firstChild;
+  assert.equal(table.type.name, "table");
+  assert.deepEqual([table.childCount, table.firstChild.firstChild.type.name, table.child(1).firstChild.type.name], [3, "table_header", "table_cell"]);
+  const md = toMarkdown(doc);
+  assert.equal(md, "| Parte | Função |\n| --- | --- |\n| **Folha** | fotossíntese |\n| Raiz | absorção \\| água |\n");
+  assert.ok(fromMarkdown(md).eq(doc), "round trip");
+  assert.equal(toText(doc), "Parte\tFunção\nFolha\tfotossíntese\nRaiz\tabsorção | água\n");
+  const { value: html } = await mammoth.convertToHtml({ buffer: Buffer.from(await toDOCX(doc)) });
+  assert.match(html, /<table><thead><tr><th><p>Parte<\/p><\/th><th><p>Função<\/p><\/th><\/tr><\/thead><tbody><tr><td><p><strong>Folha<\/strong><\/p><\/td>/);
+});

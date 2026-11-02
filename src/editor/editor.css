@@ -26,6 +26,22 @@
 .text-page hr { margin: 12pt 0; border: 0; border-top: 1px solid #c9cdd8; }
 .text-page .ProseMirror-selectednode { outline: none; }
 
+/* Tables: full text width, thin borders, header cells shaded; prosemirror-tables adds column resizing and the cell
+   selection (its own stylesheet is bundled in dist/editor.css). */
+.text-page table { width: 100%; margin: 0 0 8pt; border-collapse: collapse; table-layout: fixed; }
+.text-page td, .text-page th { position: relative; min-width: 24px; padding: 4pt 6pt; border: 1px solid #b4bccd; vertical-align: top; box-sizing: border-box; }
+.text-page th { background: #f3f4f7; font-weight: bold; text-align: left; }
+.text-page td > :last-child, .text-page th > :last-child { margin-bottom: 0; }
+.text-page .selectedCell::after { background: #6156db26; }
+.text-page .column-resize-handle { background: #6156db; }
+/* The size grid of Insert table (src/editor/tables.js). */
+.table-picker { position: fixed; z-index: 60; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 8px 28px #17213b2e; }
+.table-picker-grid { display: grid; grid-template-columns: repeat(8, calc(18px * var(--font-scale))); gap: 3px; }
+.table-picker-grid button { width: calc(18px * var(--font-scale)); height: calc(18px * var(--font-scale)); padding: 0; border: 1px solid var(--border); border-radius: 2px; background: var(--surface); cursor: pointer; }
+.table-picker-grid button.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.table-picker-grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.table-picker-size { margin: 6px 0 0; color: var(--icon); font-size: calc(12px * var(--font-scale)); text-align: center; }
+
 /* Pictures and shapes: blocks aligned left, center, or right, never wider than the text. */
 .text-page .doc-media { margin: 0 0 8pt; line-height: 0; }
 .text-page .doc-media[data-align="left"] { text-align: left; }
