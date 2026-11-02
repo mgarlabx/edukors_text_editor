@@ -7,8 +7,7 @@ globalThis.EdukorsAppConfig = {
   // Insert group of the main toolbar: tables, shapes (Common's catalog), and pictures.
   insert: ['table', 'shape', 'image'],
   // Documents are .etex packages (docs/document-package.md in Common). Export offers these formats in this order (the
-  // first is preselected); import reads the same ones, and a PDF gives its text only. The desktop host accepts only the
-  // extensions desktop/main.mjs lists.
+  // first is preselected). Open also reads the importFormats (desktop/main.mjs, openExtensions); a PDF gives its text only.
   file: {
     extension: '.etex',
     exportFormats: ['html', 'pdf', 'md', 'txt', 'docx'],
@@ -19,6 +18,9 @@ globalThis.EdukorsAppConfig = {
       { id: 'text', extensions: ['.txt'] },
       { id: 'pdf', extensions: ['.pdf'] }
     ],
+    // No Import command: Open opens these formats directly (desktop/main.mjs, openExtensions); importFormats stay as the
+    // converters Open uses.
+    importCommand: false,
     // Files opened in these formats are saved back into themselves (import format → export format). Not PDF: it opens
     // as text only, so writing it back would replace the original with that text; Save asks for an .etex instead.
     saveOriginal: { docx: 'docx', md: 'md', text: 'txt', html: 'html' }
