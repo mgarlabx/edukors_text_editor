@@ -76,3 +76,24 @@
 .context-toolbar .text-view-group { margin-left: auto; }
 /* The last control's tooltip opens to the left, inside the window. */
 .context-toolbar .text-view-group .tooltip { left: auto; right: 0; transform: none; }
+
+/* Find and replace (src/editor/search.js): a panel at the top right of the page that stays in place while the
+   page scrolls (a sticky dock of no height, so the page does not move), and the matches highlighted in the text. */
+.find-dock { position: sticky; top: 8px; z-index: 30; display: flex; justify-content: flex-end; width: min(794px, 100%); height: 0; margin: -24px auto 24px; padding-right: 12px; box-sizing: border-box; pointer-events: none; }
+.find-dock[hidden], .find-row[hidden] { display: none; }
+.find-panel { display: flex; flex-direction: column; gap: 6px; width: min(calc(440px * var(--font-scale)), 100%); height: max-content; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text, #263149); box-shadow: 0 8px 28px #17213b2e; font-size: calc(13px * var(--font-scale)); pointer-events: auto; box-sizing: border-box; }
+.find-row { display: flex; align-items: center; gap: 4px; }
+.find-replace-row { padding-left: calc(32px * var(--font-scale)); }
+.find-input { flex: 1; min-width: 0; height: calc(28px * var(--font-scale)); padding: 0 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: inherit; font: inherit; box-sizing: border-box; }
+.find-input:focus { border-color: var(--accent); outline: 1px solid var(--accent); }
+.find-panel.has-none .find-row:first-child .find-input { border-color: #d64545; outline-color: #d64545; }
+.find-count { min-width: calc(64px * var(--font-scale)); color: var(--icon); font-size: calc(12px * var(--font-scale)); text-align: right; white-space: nowrap; }
+.find-button svg { display: block; margin: auto; }
+.find-button.is-expanded svg { transform: rotate(90deg); }
+.find-option { font-size: calc(12px * var(--font-scale)); font-weight: 600; }
+.find-word { text-decoration: underline; text-underline-offset: 2px; }
+.find-text-button { height: calc(28px * var(--font-scale)); white-space: nowrap; }
+.find-text-button[aria-disabled="true"] { opacity: .45; cursor: default; }
+.find-panel .tooltip { left: auto; right: 0; transform: none; }
+.text-page .search-match { border-radius: 2px; background: #ffe58f; }
+.text-page .search-match.is-current { background: #ffb347; box-shadow: 0 0 0 1px #e8890c; }

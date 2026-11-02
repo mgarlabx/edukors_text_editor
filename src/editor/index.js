@@ -22,6 +22,7 @@ import { columnResizing, tableEditing, goToNextCell, isInTable, selectionCell, s
   deleteRow, deleteColumn, mergeCells, splitCell, toggleHeaderRow, deleteTable } from "prosemirror-tables";
 import { pickTableSize, insertTable } from "./tables.js";
 import { media } from "./schema.js";
+import { searchPlugin, createFindBar, goToMatch, SEARCH_ICON } from "./search.js";
 
 const { nodes, marks } = schema;
 const mac = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform || "");
@@ -136,7 +137,7 @@ function keys() {
   if (!mac) map["Mod-y"] = redo;
   return [keymap(map), keymap(baseKeymap)];
 }
-const plugins = () => [columnResizing(), tableEditing(), rules(), ...keys(), history(), dropCursor(), gapCursor()];
+const plugins = () => [columnResizing(), tableEditing(), rules(), ...keys(), history(), dropCursor(), gapCursor(), searchPlugin()];
 const newState = (doc) => EditorState.create({ schema, doc, plugins: plugins() });
 
 // ---------- The surface ----------
@@ -277,7 +278,7 @@ function renderSource() {
 function setSource(on) {
   if (!active) return;
   const e = editOf(active);
-  if (on) e.source = sourceOf(active);
+  if (on) { findBar.close({ focus: false }); e.source = sourceOf(active); }
   else { applySource(active); e.source = null; }
   renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
   if (on) sourceArea.focus(); else view.focus();
@@ -297,6 +298,47 @@ function sourceButton() {
   return button;
 }
 
+// ---------- Find and replace (src/editor/search.js) ----------
+// The panel floats at the top right of the page. It searches the formatted text, so it closes in the Markdown source.
+const findBar = createFindBar({
+  t, view: () => (view && !sourceOn() ? view : null),
+  toast: (message) => EdukorsFileDialogs.toast({ t, message }),
+  onChange() {
+    document.querySelector('.context-toolbar [data-control="find"]')?.setAttribute("aria-pressed", String(findBar.isOpen));
+    // A match scrolled to stays clear of the panel.
+    view?.setProps({ scrollMargin: findBar.isOpen ? { top: findBar.element.firstChild.offsetHeight + 24, bottom: 24, left: 8, right: 8 } : 5 });
+  },
+});
+function findButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "format-button icon";
+  button.dataset.control = "find";
+  button.setAttribute("aria-pressed", String(findBar.isOpen));
+  button.setAttribute("aria-label", t("findReplace"));
+  button.setAttribute("aria-keyshortcuts", mac ? "Meta+F" : "Control+F");
+  button.innerHTML = `${SEARCH_ICON}<span class="tooltip" aria-hidden="true"></span>`;
+  button.querySelector(".tooltip").textContent = `${t("findReplace")} (${mac ? "⌘F" : "Ctrl+F"})`;
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+  button.addEventListener("click", () => (findBar.isOpen ? findBar.close() : findBar.open()));
+  return button;
+}
+// Cmd+F (Ctrl+F) finds; Option+Cmd+F (Ctrl+H) also shows the replace field; Cmd+G and Shift+Cmd+G (F3 and Shift+F3)
+// go to the next and previous match; Escape in the text closes the panel.
+document.addEventListener("keydown", (event) => {
+  if (!view || sourceOn() || document.querySelector("dialog[open]")) return;
+  const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  const replace = mac ? mod && event.altKey && event.code === "KeyF" : mod && !event.altKey && event.code === "KeyH";
+  if (replace || (mod && !event.altKey && !event.shiftKey && event.code === "KeyF")) { event.preventDefault(); findBar.open({ replace }); return; }
+  if (findBar.isOpen && ((mod && !event.altKey && event.code === "KeyG") || event.key === "F3")) {
+    event.preventDefault();
+    goToMatch({ step: event.shiftKey ? -1 : 1 })(view.state, view.dispatch);
+    findBar.refresh();
+    return;
+  }
+  if (findBar.isOpen && event.key === "Escape" && view.dom.contains(event.target)) { event.preventDefault(); findBar.close(); }
+}, true);
+
 let toolbarKind = null;
 function renderToolbar() {
   const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
@@ -310,7 +352,7 @@ function renderToolbar() {
     groups.className = "text-format-groups";
     const end = document.createElement("div");
     end.className = "format-group text-view-group";
-    end.append(breaksButton(), ...(isMarkdown(active) ? [sourceButton()] : []));
+    end.append(...(kind === "source" ? [] : [findButton()]), breaksButton(), ...(isMarkdown(active) ? [sourceButton()] : []));
     bar.replaceChildren(groups, end);
     toolbar = EdukorsFormat.render(groups, {
       groups: GROUPS[kind], state: format, t, onChange: onFormat,
@@ -421,6 +463,7 @@ function show(doc) {
   // Leaving a document shown as source: the source goes into it, and it shows formatted next time.
   if (active && active !== doc && sourceOn()) { applySource(active); editOf(active).source = null; }
   if (!doc) {
+    findBar.close({ focus: false });
     view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert(); renderBubble();
     renderPageBreaks(host, null, false);
     host.classList.remove("text-page");
@@ -457,12 +500,15 @@ function show(doc) {
         if (tr.docChanged) markModified(active);
         renderToolbar(); renderEdit(); renderBubble();
         if (tr.docChanged) renderBreaks();
+        findBar.refresh();
       },
     });
+    host.before(findBar.element);
     // Pictures that finish loading, and wrapping text, change the height: the page-break marks follow.
     new ResizeObserver(() => renderBreaks()).observe(view.dom);
   } else view.updateState(editor.state);
   renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
+  findBar.sync();
   document.querySelector(".document-body").style.marginTop = `${document.getElementById("context-toolbar").offsetHeight}px`;
 }
 
@@ -471,7 +517,7 @@ document.addEventListener("scroll", () => renderBubble(), true);
 addEventListener("resize", () => renderBubble());
 // After a save, the saved content is the baseline for "modified".
 document.addEventListener("edukors:document-saved", (event) => { const doc = event.detail.doc; editOf(doc).saved = editOf(doc).state.doc; markModified(doc); });
-document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); });
+document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); findBar.labels(); });
 // Clicking the empty part of the page below the text puts the cursor at the end. When the document ends with a table,
 // a picture, or a shape, an empty paragraph is added after it first, so there is always a place to keep writing.
 document.addEventListener("mousedown", (event) => {

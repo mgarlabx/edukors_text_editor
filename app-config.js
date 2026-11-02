@@ -4,6 +4,8 @@ globalThis.EdukorsAppConfig = {
   version: 'v.26.11.02',            // the release date; package.json holds the same date as 26.11.2
   // Version of the terms of use below. The app asks once per version; change it when the terms change.
   termsVersion: '2026-11-02.2',
+  // No left sidebar (Common's placeholder panel and its toolbar toggle).
+  sidebar: false,
   // Insert group of the main toolbar: tables, shapes (Common's catalog), and pictures.
   insert: ['table', 'shape', 'image'],
   // Documents are .etex packages (docs/document-package.md in Common). Export offers these formats in this order (the
@@ -46,6 +48,10 @@ The Edukors Text Editor writes documents laid out like Word's: an A4 page with 2
 - With the cursor in a link, a bubble shows its address; **Cmd+click** (Ctrl+click on Windows and Linux) opens it in the browser.
 - Dashed marks show where each PDF page ends; the switch at the end of the bar hides them.
 
+## Find and replace
+
+**Cmd+F** (Ctrl+F), or the magnifier at the end of the bar, finds text in the document; **Option+Cmd+F** (Ctrl+H) also shows the replace field. Enter goes to the next match and Shift+Enter to the previous one; **Aa** matches case and **ab** whole words. **Replace** changes the current match, **Replace all** every one (a single Undo brings them back). Escape closes the panel.
+
 ## Insert
 
 - **Table**: pick the rows and columns in the grid. Tab moves between cells; drag a border to change a column's width; the Table menu in the bar adds, deletes, merges, and splits rows and columns.
@@ -71,6 +77,8 @@ Connect an account in **Settings → AI assistant** (Claude Code or Codex, insta
 | Bold, Italic, Underline | Cmd+B, Cmd+I, Cmd+U | Ctrl+B, Ctrl+I, Ctrl+U |
 | Strikethrough, Inline code | Shift+Cmd+X, Cmd+E | Shift+Ctrl+X, Ctrl+E |
 | Paragraph, Heading 1–3 | Option+Cmd+0, Option+Cmd+1–3 | Alt+Ctrl+0, Alt+Ctrl+1–3 |
+| Find, Find and replace | Cmd+F, Option+Cmd+F | Ctrl+F, Ctrl+H |
+| Next, previous match | Cmd+G, Shift+Cmd+G | F3, Shift+F3 |
 | Close tab | Cmd+W | Ctrl+W |`,
       pt: `# Guia rápido
 
@@ -89,6 +97,10 @@ O Edukors Text Editor escreve documentos com a página do Word: A4, margens de 2
 - Numa lista, **Tab** e **Shift+Tab** mudam o nível.
 - Com o cursor num link, um balão mostra o endereço; **Cmd+clique** (Ctrl+clique no Windows e no Linux) abre o link no navegador.
 - Marcas tracejadas mostram onde termina cada página do PDF; a chave no fim da barra as esconde.
+
+## Localizar e substituir
+
+**Cmd+F** (Ctrl+F), ou a lupa no fim da barra, procura um texto no documento; **Option+Cmd+F** (Ctrl+H) mostra também o campo de substituição. Enter vai à próxima ocorrência e Shift+Enter à anterior; **Aa** diferencia maiúsculas e minúsculas e **ab** busca palavras inteiras. **Substituir** troca a ocorrência atual, **Substituir tudo** todas (um único Desfazer as traz de volta). Esc fecha o painel.
 
 ## Inserir
 
@@ -115,6 +127,8 @@ Conecte uma conta em **Configurações → Assistente de IA** (Claude Code ou Co
 | Negrito, Itálico, Sublinhado | Cmd+B, Cmd+I, Cmd+U | Ctrl+B, Ctrl+I, Ctrl+U |
 | Tachado, Código | Shift+Cmd+X, Cmd+E | Shift+Ctrl+X, Ctrl+E |
 | Parágrafo, Título 1–3 | Option+Cmd+0, Option+Cmd+1–3 | Alt+Ctrl+0, Alt+Ctrl+1–3 |
+| Localizar, Localizar e substituir | Cmd+F, Option+Cmd+F | Ctrl+F, Ctrl+H |
+| Próxima, anterior ocorrência | Cmd+G, Shift+Cmd+G | F3, Shift+F3 |
 | Fechar aba | Cmd+W | Ctrl+W |`,
       es: `# Guía rápida
 
@@ -133,6 +147,10 @@ Edukors Text Editor escribe documentos con la página de Word: A4, márgenes de 
 - En una lista, **Tab** y **Shift+Tab** cambian el nivel.
 - Con el cursor en un enlace, un globo muestra su dirección; **Cmd+clic** (Ctrl+clic en Windows y Linux) lo abre en el navegador.
 - Marcas discontinuas muestran dónde termina cada página del PDF; el interruptor al final de la barra las oculta.
+
+## Buscar y reemplazar
+
+**Cmd+F** (Ctrl+F), o la lupa al final de la barra, busca un texto en el documento; **Option+Cmd+F** (Ctrl+H) muestra también el campo de reemplazo. Enter va a la siguiente coincidencia y Shift+Enter a la anterior; **Aa** distingue mayúsculas y minúsculas y **ab** busca palabras completas. **Reemplazar** cambia la coincidencia actual, **Reemplazar todo** todas (un solo Deshacer las devuelve). Esc cierra el panel.
 
 ## Insertar
 
@@ -159,6 +177,8 @@ Conecte una cuenta en **Configuración → Asistente de IA** (Claude Code o Code
 | Negrita, Cursiva, Subrayado | Cmd+B, Cmd+I, Cmd+U | Ctrl+B, Ctrl+I, Ctrl+U |
 | Tachado, Código | Shift+Cmd+X, Cmd+E | Shift+Ctrl+X, Ctrl+E |
 | Párrafo, Título 1–3 | Option+Cmd+0, Option+Cmd+1–3 | Alt+Ctrl+0, Alt+Ctrl+1–3 |
+| Buscar, Buscar y reemplazar | Cmd+F, Option+Cmd+F | Ctrl+F, Ctrl+H |
+| Siguiente, anterior coincidencia | Cmd+G, Shift+Cmd+G | F3, Shift+F3 |
 | Cerrar pestaña | Cmd+W | Ctrl+W |`
     },
     termsOfUse: {
