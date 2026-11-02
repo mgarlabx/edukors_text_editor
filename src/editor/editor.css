@@ -8,6 +8,8 @@
   margin: 0 auto; padding: 75.6px 76px; box-sizing: border-box; border-radius: 2px; background: #fff; color: #000;
   font: 12pt/1.5 Arial, Helvetica, sans-serif; cursor: text; user-select: text;
 }
+/* With no document open the shell hides the page (hidden); the id rule above must not show it again. */
+#document-placeholder.text-page[hidden] { display: none; }
 .text-page .ProseMirror { min-height: 900px; outline: none; white-space: pre-wrap; overflow-wrap: break-word; }
 .text-page .ProseMirror > :first-child { margin-top: 0; }
 .text-page p { margin: 0 0 8pt; }

@@ -343,6 +343,8 @@ function show(doc) {
   if (!doc) {
     view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert(); renderBubble();
     renderPageBreaks(host, null, false);
+    host.classList.remove("text-page");
+    host.replaceChildren();
     document.querySelector(".workspace")?.classList.remove("text-workspace");
     document.querySelector(".document-body").style.marginTop = "";
     return;
