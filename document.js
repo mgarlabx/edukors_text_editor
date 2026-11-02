@@ -81,14 +81,16 @@ globalThis.EdukorsTextDocument = (() => {
   }
 
   function adopt(doc, content) {
-    EdukorsTextEditor.adopt(doc, content.text);
+    EdukorsTextEditor.adopt(doc, content.text, { markdown: content.markdown });
     EdukorsAiAssistant.restoreConversations(doc, content.conversations || []);
   }
 
-  // Export: HTML, PDF, Markdown, plain text, DOCX. Import: the same formats except that a PDF gives its text only.
-  const exportFile = ({ doc, format, title }) => EdukorsTextEditor.exportDocument(EdukorsTextEditor.toJSON(doc), format, title);
+  // Export: HTML, PDF, Markdown, plain text, DOCX. Reading other formats (Open): the same, except that a PDF gives its
+  // text only. A Markdown file keeps its exact text, so it can be edited as source and saved as written.
+  const exportFile = ({ doc, format, title }) => EdukorsTextEditor.exportFor(doc, format, title);
   async function importFile({ format, bytes }) {
-    return { text: await EdukorsTextEditor.importDocument(format, bytes), conversations: [] };
+    const markdown = format === 'md' ? new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '') : undefined;
+    return { text: await EdukorsTextEditor.importDocument(format, bytes), conversations: [], markdown };
   }
 
   globalThis.EdukorsAppDocument = Object.freeze({ toBytes, fromBytes, adopt, exportFile, importFile, selectAll: () => EdukorsTextEditor.selectAll() });

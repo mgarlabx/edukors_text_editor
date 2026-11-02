@@ -14,7 +14,7 @@ import { inputRules, wrappingInputRule, textblockTypeInputRule, smartQuotes, emD
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import { schema, emptyDoc, docFromJSON, ALIGNS, DEFAULT_FONT, DEFAULT_SIZE, SIZE_RANGE } from "./schema.js";
-import { exportDocument, importDocument } from "./convert.js";
+import { exportDocument, importDocument, fromMarkdown, toMarkdown } from "./convert.js";
 import { nodeViews, insertShape, insertImageFromFile } from "./media.js";
 import { renderPageBreaks } from "./pages.js";
 import * as ai from "./ai.js";
@@ -156,7 +156,7 @@ function markModified(doc) {
 
 // What the selection is: a picture, a shape, or text. The format bar shows the groups for it.
 const kindOf = (state) => (state.selection instanceof NodeSelection && (state.selection.node.type === nodes.image || state.selection.node.type === nodes.shape) ? state.selection.node.type.name : "text");
-const GROUPS = { text: ["blockStyle", "text", "align", "lists", "link"], table: ["blockStyle", "text", "align", "lists", "link", "table"], image: ["align"], shape: ["shape", "align"] };
+const GROUPS = { source: [], text: ["blockStyle", "text", "align", "lists", "link"], table: ["blockStyle", "text", "align", "lists", "link", "table"], image: ["align"], shape: ["shape", "align"] };
 const TABLE_ACTIONS = { addRowBefore, addRowAfter, addColumnBefore, addColumnAfter, deleteRow, deleteColumn, mergeCells, splitCell, toggleHeaderRow, deleteTable };
 // The format bar's kind: a picture, a shape, text in a table (adds the table group), or text.
 const barKind = (state) => { const kind = kindOf(state); return kind === "text" && isInTable(state) ? "table" : kind; };
@@ -231,28 +231,92 @@ function breaksButton() {
   });
   return button;
 }
-const renderBreaks = () => { if (view) renderPageBreaks(page(), view.dom, showBreaks, (n) => t("pageNumber").replace("{n}", n)); };
+const renderBreaks = () => { if (view) renderPageBreaks(page(), view.dom, showBreaks && !sourceOn(), (n) => t("pageNumber").replace("{n}", n)); };
+
+// ---------- Markdown source ----------
+// A document read from a Markdown file can be edited as its source. editor.markdown = { text, doc }: the Markdown text
+// as last read, written, or edited, and the document it gives; while the document has not changed since, that exact
+// text is what the source shows and what Save writes (Markdown is regenerated only after changes in the formatted
+// view). editor.source holds the source being edited (null when the formatted view shows).
+const isMarkdown = (doc) => !!doc && !!editOf(doc).markdown;
+const sourceOn = () => !!active && editOf(active).source != null;
+let sourceArea = null;
+function sourceOf(doc) { const e = editOf(doc); return e.markdown && e.state.doc.eq(e.markdown.doc) ? e.markdown.text : toMarkdown(e.state.doc); }
+// Applies a change to a document's state, shown or not (one undo step each).
+function applyTr(doc, tr) {
+  if (doc === active && view) view.dispatch(tr);
+  else { editOf(doc).state = editOf(doc).state.apply(tr); markModified(doc); }
+}
+// Puts the source being edited into the document (one undo step when it changes something) and keeps it as the text.
+function applySource(doc) {
+  const e = editOf(doc);
+  if (e.source == null) return;
+  const text = e.source, parsed = fromMarkdown(text);
+  if (!parsed.eq(e.state.doc)) applyTr(doc, e.state.tr.replaceWith(0, e.state.doc.content.size, parsed.content));
+  e.markdown = { text, doc: editOf(doc).state.doc };
+}
+function grow() { if (sourceArea) { sourceArea.style.height = "auto"; sourceArea.style.height = `${sourceArea.scrollHeight}px`; } }
+function renderSource() {
+  const on = !!view && sourceOn();
+  if (on && !sourceArea) {
+    sourceArea = document.createElement("textarea");
+    sourceArea.className = "markdown-source";
+    sourceArea.spellcheck = false;
+    sourceArea.addEventListener("input", () => {
+      editOf(active).source = sourceArea.value;
+      if (!active.modified) { active.modified = true; document.dispatchEvent(new CustomEvent("edukors:document-modified", { detail: { id: active.id } })); }
+      grow();
+    });
+    page().append(sourceArea);
+  }
+  if (sourceArea) { sourceArea.hidden = !on; sourceArea.setAttribute("aria-label", t("markdownSource")); }
+  if (view) view.dom.style.display = on ? "none" : "";
+  if (on && sourceArea.value !== editOf(active).source) { sourceArea.value = editOf(active).source; sourceArea.scrollTop = 0; }
+  if (on) grow();
+}
+function setSource(on) {
+  if (!active) return;
+  const e = editOf(active);
+  if (on) e.source = sourceOf(active);
+  else { applySource(active); e.source = null; }
+  renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
+  if (on) sourceArea.focus(); else view.focus();
+}
+const SOURCE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>';
+function sourceButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "format-button icon";
+  button.dataset.control = "markdownSource";
+  button.setAttribute("aria-pressed", String(sourceOn()));
+  button.setAttribute("aria-label", t("markdownSource"));
+  button.innerHTML = `${SOURCE_ICON}<span class="tooltip" aria-hidden="true"></span>`;
+  button.querySelector(".tooltip").textContent = t("markdownSource");
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+  button.addEventListener("click", () => setSource(!sourceOn()));
+  return button;
+}
 
 let toolbarKind = null;
 function renderToolbar() {
   const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
   if (!view) { slot.classList.remove("is-open", "is-settled"); slot.inert = true; toolbar = null; toolbarKind = null; bar.replaceChildren(); return; }
-  const kind = barKind(view.state);
+  const kind = sourceOn() ? "source" : barKind(view.state), key = `${kind}${isMarkdown(active) ? ":md" : ""}`;
   readFormat(view.state);
-  if (!toolbar || kind !== toolbarKind) {
+  if (!toolbar || key !== toolbarKind) {
     bar.setAttribute("aria-label", t("contextToolbar"));
     // The shared groups render into their own holder; the page-break switch sits at the end of the bar.
     const groups = document.createElement("div");
     groups.className = "text-format-groups";
     const end = document.createElement("div");
     end.className = "format-group text-view-group";
-    end.append(breaksButton());
+    end.append(breaksButton(), ...(isMarkdown(active) ? [sourceButton()] : []));
     bar.replaceChildren(groups, end);
     toolbar = EdukorsFormat.render(groups, {
       groups: GROUPS[kind], state: format, t, onChange: onFormat,
       options: { fontSizes: FONT_SIZES, fontFamilies: FONT_FAMILIES, fontSizeRange: { ...SIZE_RANGE, step: 0.5 }, linkQr: false },
     });
-    toolbarKind = kind;
+    toolbarKind = key;
     slot.classList.add("is-open", "is-settled");
     slot.inert = false;
   } else toolbar.refresh();
@@ -296,7 +360,7 @@ function renderBubble() {
 const EDIT = ["undo", "redo", "cut", "copy", "paste", "delete"];
 const editButton = (key) => document.querySelector(`#edit-actions [data-command="${key}"]`);
 function renderEdit() {
-  const state = view?.state;
+  const state = sourceOn() ? null : view?.state; // the source editor has its own undo and clipboard
   const available = state ? { undo: undoDepth(state) > 0, redo: redoDepth(state) > 0, cut: !state.selection.empty, copy: !state.selection.empty, paste: true, delete: !state.selection.empty } : {};
   for (const key of [...EDIT, "duplicate"]) {
     const button = editButton(key);
@@ -340,7 +404,7 @@ insertButton("insertImage")?.addEventListener("click", () => {
 function renderInsert() {
   for (const key of ["insertTable", "insertShape", "insertImage"]) {
     const button = insertButton(key);
-    if (button) { if (view) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true"); }
+    if (button) { if (view && !sourceOn()) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true"); }
   }
 }
 
@@ -354,11 +418,14 @@ fitBelowBar.observe(document.getElementById("context-toolbar"));
 
 function show(doc) {
   const host = page();
+  // Leaving a document shown as source: the source goes into it, and it shows formatted next time.
+  if (active && active !== doc && sourceOn()) { applySource(active); editOf(active).source = null; }
   if (!doc) {
     view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert(); renderBubble();
     renderPageBreaks(host, null, false);
     host.classList.remove("text-page");
     host.replaceChildren();
+    sourceArea = null;
     document.querySelector(".workspace")?.classList.remove("text-workspace");
     document.querySelector(".document-body").style.marginTop = "";
     return;
@@ -370,6 +437,7 @@ function show(doc) {
   document.querySelector(".workspace")?.classList.add("text-workspace");
   if (!view) {
     host.replaceChildren();
+    sourceArea = null;
     view = new EditorView(host, {
       state: editor.state,
       nodeViews,
@@ -394,7 +462,7 @@ function show(doc) {
     // Pictures that finish loading, and wrapping text, change the height: the page-break marks follow.
     new ResizeObserver(() => renderBreaks()).observe(view.dom);
   } else view.updateState(editor.state);
-  renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
+  renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
   document.querySelector(".document-body").style.marginTop = `${document.getElementById("context-toolbar").offsetHeight}px`;
 }
 
@@ -418,12 +486,25 @@ document.addEventListener("mousedown", (event) => {
 globalThis.EdukorsTextEditor = Object.freeze({
   schema,
   /** The content to save: the document's current state as JSON. */
-  toJSON: (doc) => (doc.editor ? doc.editor.state.doc.toJSON() : doc.text ?? emptyDoc().toJSON()),
+  toJSON: (doc) => { if (doc.editor?.source != null) applySource(doc); return doc.editor ? doc.editor.state.doc.toJSON() : doc.text ?? emptyDoc().toJSON(); },
+  /** Export (and saving back into a Markdown file): a document still matching its Markdown text writes that text as is. */
+  async exportFor(doc, format, title) {
+    const json = EdukorsTextEditor.toJSON(doc), e = editOf(doc);
+    if (format === "md" && e.markdown && e.state.doc.eq(e.markdown.doc)) return { data: e.markdown.text };
+    const out = await exportDocument(json, format, title);
+    if (format === "md" && e.markdown) e.markdown = { text: out.data, doc: e.state.doc };
+    return out;
+  },
   /** Checks a file's content and returns it as JSON again; throws when it is not valid. */
   check: (json) => docFromJSON(json).toJSON(),
   empty: () => emptyDoc().toJSON(),
   /** Gives a document opened or imported content; the next time it shows, it starts from it, with no undo history. */
-  adopt(doc, json) { doc.text = json; doc.editor = null; editOf(doc).saved = editOf(doc).state.doc; },
+  adopt(doc, json, { markdown } = {}) {
+    doc.text = json; doc.editor = null;
+    const e = editOf(doc);
+    e.saved = e.state.doc;
+    if (typeof markdown === "string") e.markdown = { text: markdown, doc: e.state.doc };
+  },
   /** Selects the whole active document (the menu's Select All outside a text field). */
   selectAll() { if (view) { view.focus(); view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 0, view.state.doc.content.size))); } },
   /** Export and Import (src/editor/convert.js): exportDocument(json, format, title), importDocument(format, bytes). */
@@ -438,9 +519,11 @@ globalThis.EdukorsTextEditor = Object.freeze({
       const operation = { insert_content: ai.insertContent, replace_blocks: ai.replaceBlocks, set_block_style: ai.setBlockStyle, format_text: ai.formatText,
         replace_text: ai.replaceText, insert_shape: ai.insertShape, insert_image: ai.insertImage }[name];
       if (!operation) throw new Error(`Unknown change "${name}".`);
-      const editor = editOf(doc), { tr, result } = operation(editor.state, args);
-      if (doc === active && view) view.dispatch(tr);
-      else { editor.state = editor.state.apply(tr); markModified(doc); }
+      // A source being edited goes into the document first; afterwards the source shows the result.
+      if (editOf(doc).source != null) applySource(doc);
+      const { tr, result } = operation(editOf(doc).state, args);
+      applyTr(doc, tr);
+      if (editOf(doc).source != null) { editOf(doc).source = sourceOf(doc); if (doc === active) renderSource(); }
       return result;
     },
   },

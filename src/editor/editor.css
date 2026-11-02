@@ -67,6 +67,10 @@
 .link-bubble span { flex-shrink: 0; }
 .text-page a { cursor: text; }
 
+/* The Markdown source of a document read from a .md file, in place of the formatted text. */
+.text-page .markdown-source { display: block; width: 100%; min-height: 900px; padding: 0; border: 0; outline: none; resize: none; overflow: hidden; background: transparent; color: #1f2430; font: 10.5pt/1.6 Menlo, "SF Mono", Consolas, "Courier New", monospace; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
+.text-page .markdown-source[hidden] { display: none; }
+
 /* The bar: Common's groups, then the page-break switch at the end. */
 .context-toolbar .text-format-groups { display: contents; }
 .context-toolbar .text-view-group { margin-left: auto; }
