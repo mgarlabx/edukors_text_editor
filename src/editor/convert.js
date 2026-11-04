@@ -364,21 +364,19 @@ export async function fromPDF(bytes) {
 }
 
 // ---------- Entry points ----------
-/** Export: { html, width, height } for HTML and PDF (the host prints the PDF); { data } for the other formats. */
+/** Export: { html, width, height } for PDF (the host prints it, A4); { data } for Markdown and plain text. */
 export async function exportDocument(json, format, title) {
   const doc = docFromJSON(json);
-  if (format === "html" || format === "pdf") return { html: await toHTML(doc, title), width: 794, height: 1123 };
+  if (format === "pdf") return { html: await toHTML(doc, title), width: 794, height: 1123 };
   if (format === "md") return { data: toMarkdown(doc) };
   if (format === "txt") return { data: toText(doc) };
-  if (format === "docx") return { data: await toDOCX(doc, title) };
   throw new Error(`Unknown export format "${format}".`);
 }
 
 /** Import: the document as JSON, checked against the schema like a file being opened. */
 export async function importDocument(format, bytes) {
   const text = () => new TextDecoder("utf-8").decode(bytes).replace(/^﻿/, "");
-  const doc = format === "html" ? fromHTML(text())
-    : format === "md" ? fromMarkdown(text())
+  const doc = format === "md" ? fromMarkdown(text())
     : format === "text" ? fromText(text())
     : format === "docx" ? await fromDOCX(bytes)
     : format === "pdf" ? await fromPDF(bytes)

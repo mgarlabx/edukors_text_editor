@@ -85,8 +85,7 @@ globalThis.EdukorsTextDocument = (() => {
     EdukorsAiAssistant.restoreConversations(doc, content.conversations || []);
   }
 
-  // Export: HTML, PDF, Markdown, plain text, DOCX. Reading other formats (Open): the same, except that a PDF gives its
-  // text only. A Markdown file keeps its exact text, so it can be edited as source and saved as written.
+  // Export: PDF (A4), Markdown, and plain text; Print uses the same page as the PDF. Open also reads DOCX and PDF (text only). A Markdown file keeps its exact text, so it can be edited as source and saved as written.
   const exportFile = ({ doc, format, title }) => EdukorsTextEditor.exportFor(doc, format, title);
   async function importFile({ format, bytes }) {
     const markdown = format === 'md' ? new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '') : undefined;

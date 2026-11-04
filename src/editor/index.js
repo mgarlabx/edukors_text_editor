@@ -211,6 +211,41 @@ function onFormat(property, value) {
   view.focus();
 }
 
+// Document zoom is a view preference; it never changes editor state or exported font sizes.
+const ZOOM_KEY = "edukors.text.zoom";
+let textZoom = (() => { try { const n = Number(localStorage.getItem(ZOOM_KEY)); return n >= 50 && n <= 200 ? Math.round(n / 10) * 10 : 100; } catch { return 100; } })();
+function zoomControls() {
+  const label = document.createElement("output");
+  label.className = "text-zoom-value";
+  label.setAttribute("aria-live", "polite");
+  const names = { en: ["Zoom out text", "Zoom in text"], pt: ["Diminuir zoom do texto", "Aumentar zoom do texto"], es: ["Reducir zoom del texto", "Ampliar zoom del texto"] };
+  const buttons = [-10, 10].map((step, i) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "format-button icon";
+    button.dataset.control = i ? "textZoomIn" : "textZoomOut";
+    button.textContent = i ? "+" : "−";
+    button.title = (names[document.documentElement.lang] || names.en)[i];
+    button.setAttribute("aria-label", button.title);
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", () => {
+      textZoom = Math.max(50, Math.min(200, textZoom + step));
+      try { localStorage.setItem(ZOOM_KEY, String(textZoom)); } catch { /* session only */ }
+      refresh();
+      renderBubble();
+    });
+    return button;
+  });
+  function refresh() {
+    page().style.zoom = String(textZoom / 100);
+    label.textContent = `${textZoom}%`;
+    buttons[0].disabled = textZoom <= 50;
+    buttons[1].disabled = textZoom >= 200;
+  }
+  refresh();
+  return [buttons[0], label, buttons[1]];
+}
+
 // Page breaks: shown by default; the choice is kept on this computer.
 const BREAKS_KEY = "edukors.text.pageBreaks";
 let showBreaks = (() => { try { return localStorage.getItem(BREAKS_KEY) !== "false"; } catch { return true; } })();
@@ -340,6 +375,75 @@ document.addEventListener("keydown", (event) => {
   if (findBar.isOpen && event.key === "Escape" && view.dom.contains(event.target)) { event.preventDefault(); findBar.close(); }
 }, true);
 
+// Print (main toolbar, after Export; Cmd+P or Ctrl+P): the same page as the PDF export (A4, 20 mm margins), through the
+// system's print dialog.
+const PRINT_LABELS = { en: "Print", pt: "Imprimir", es: "Imprimir" };
+const PRINT_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>`;
+const printButton = (() => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.command = "print";
+  button.className = "tool document-action";
+  button.hidden = !document.querySelector('[data-command="export"]:not([hidden])');
+  button.innerHTML = PRINT_ICON;
+  const tooltip = document.createElement("span");
+  tooltip.className = "tooltip";
+  tooltip.setAttribute("aria-hidden", "true");
+  button.append(tooltip);
+  const after = document.querySelector('#file-actions [data-command="export"]');
+  if (after) after.after(button); else document.getElementById("file-actions")?.append(button);
+  return button;
+})();
+function printLabels() {
+  const label = PRINT_LABELS[document.documentElement.lang] || PRINT_LABELS.en;
+  printButton.setAttribute("aria-label", `${label} (${mac ? "⌘P" : "Ctrl+P"})`);
+  printButton.querySelector(".tooltip").textContent = label;
+}
+printLabels();
+let printing = false;
+// Electron ignores print() in a frame, so the page itself is printed: the exported page goes into a shadow root (its
+// styles stay inside it), and print-only rules hide the rest of the window while the system's dialog is open.
+const PRINT_SHELL_CSS = `@media screen{#text-print-root{display:none}}
+@media print{@page{size:A4;margin:20mm}
+html,body{height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;margin:0!important;padding:0!important;display:block!important}
+body>*:not(#text-print-root){display:none!important}#text-print-root{display:block}}`;
+async function printDocument() {
+  if (!active || printing) return;
+  printing = true;
+  const root = document.createElement("div"), style = document.createElement("style");
+  try {
+    const { html } = await exportDocument(EdukorsTextEditor.toJSON(active), "pdf", EdukorsDocuments.nameOf(active));
+    const page = new DOMParser().parseFromString(html, "text/html");
+    const css = [...page.querySelectorAll("style")].map((node) => node.textContent).join("\n")
+      .replace(/@page\{[^}]*\}/g, "").replace(/@media screen\{body\{[^}]*\}\}/g, "").replace(/(^|[\n}])body\{/g, "$1:host{display:block;");
+    root.id = "text-print-root";
+    root.setAttribute("aria-hidden", "true");
+    const shadow = root.attachShadow({ mode: "open" });
+    const pageStyle = document.createElement("style");
+    pageStyle.textContent = css;
+    shadow.append(pageStyle, ...page.body.childNodes);
+    style.textContent = PRINT_SHELL_CSS;
+    document.head.append(style);
+    document.body.append(root);
+    await Promise.all([...shadow.querySelectorAll("img")].map((img) => img.decode().catch(() => {})));
+    window.print();
+  } catch (error) {
+    EdukorsFileDialogs.toast({ t, message: `${PRINT_LABELS[document.documentElement.lang] || PRINT_LABELS.en}: ${error.message}` });
+  } finally {
+    root.remove();
+    style.remove();
+    printing = false;
+    view?.focus();
+  }
+}
+printButton.addEventListener("click", printDocument);
+document.addEventListener("keydown", (event) => {
+  const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (!mod || event.altKey || event.shiftKey || event.code !== "KeyP" || !active || document.querySelector("dialog[open]")) return;
+  event.preventDefault();
+  printDocument();
+}, true);
+
 let toolbarKind = null;
 function renderToolbar() {
   const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
@@ -353,7 +457,7 @@ function renderToolbar() {
     groups.className = "text-format-groups";
     const end = document.createElement("div");
     end.className = "format-group text-view-group";
-    end.append(...(kind === "source" ? [] : [findButton()]), breaksButton(), ...(isMarkdown(active) ? [sourceButton()] : []));
+    end.append(...zoomControls(), ...(kind === "source" ? [] : [findButton()]), breaksButton(), ...(isMarkdown(active) ? [sourceButton()] : []));
     bar.replaceChildren(groups, end);
     toolbar = EdukorsFormat.render(groups, {
       groups: GROUPS[kind], state: format, t, onChange: onFormat,
@@ -518,7 +622,7 @@ document.addEventListener("scroll", () => renderBubble(), true);
 addEventListener("resize", () => renderBubble());
 // After a save, the saved content is the baseline for "modified".
 document.addEventListener("edukors:document-saved", (event) => { const doc = event.detail.doc; editOf(doc).saved = editOf(doc).state.doc; markModified(doc); });
-document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); findBar.labels(); });
+document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); findBar.labels(); printLabels(); });
 // Clicking the empty part of the page below the text puts the cursor at the end. When the document ends with a table,
 // a picture, or a shape, an empty paragraph is added after it first, so there is always a place to keep writing.
 document.addEventListener("mousedown", (event) => {

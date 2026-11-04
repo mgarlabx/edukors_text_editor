@@ -12,36 +12,35 @@ globalThis.EdukorsAppConfig = {
   // first is preselected). Open also reads the importFormats (desktop/main.mjs, openExtensions); a PDF gives its text only.
   file: {
     extension: '.etex',
-    exportFormats: ['html', 'pdf', 'md', 'txt', 'docx'],
+    exportFormats: ['pdf', 'txt', 'md'],
     importFormats: [
       { id: 'docx', extensions: ['.docx'] },
-      { id: 'html', extensions: ['.html', '.htm'] },
-      { id: 'md', extensions: ['.md', '.markdown'] },
+      { id: 'md', extensions: ['.md'] },
       { id: 'text', extensions: ['.txt'] },
       { id: 'pdf', extensions: ['.pdf'] }
     ],
     // No Import command: Open opens these formats directly (desktop/main.mjs, openExtensions); importFormats stay as the
     // converters Open uses.
     importCommand: false,
-    // Files opened in these formats are saved back into themselves (import format → export format). Not PDF: it opens
-    // as text only, so writing it back would replace the original with that text; Save asks for an .etex instead.
-    saveOriginal: { docx: 'docx', md: 'md', text: 'txt', html: 'html' }
+    // Markdown and plain text can be saved in place. DOCX and PDF use Save As .etex.
+    saveOriginal: { md: 'md', text: 'txt' }
   },
   // Help (Markdown, by interface language; a language without its own text shows English).
   help: {
     quickGuide: {
       en: `# Quick guide
 
-The Edukors Text Editor writes documents laid out like Word's: an A4 page with 20 mm margins. Its own files are **.etex**; it also opens and saves DOCX, Markdown, text, and HTML files.
+The Edukors Text Editor writes documents laid out like Word's: an A4 page with 20 mm margins. Its own files are **.etex**; it opens DOCX, Markdown, text, and PDF files; output formats are .etex, .pdf, .txt, and .md.
 
 ## Start
 
 - **New** creates an empty document; each document gets a tab, and the dot on a tab means unsaved changes.
-- **Open** reads an .etex, DOCX, Markdown, text, PDF, or HTML file. A double-click on an .etex in the Finder or Explorer opens it here too.
+- **Open** reads an .etex, DOCX, Markdown, text, or PDF file. A double-click on an .etex in the Finder or Explorer opens it here too.
 - **Recent** lists the documents saved or opened most recently.
 
 ## Write and format
 
+- **− / +** zoom the document view without changing saved font sizes or the interface.
 - The bar above the page holds the style (paragraph, headings, quote, code), font, size, color, bold, italic, underline, alignment, lists, and links.
 - While typing: **# **, **## **, or **### ** start a heading; **- ** a bulleted list; **1. ** a numbered list; **> ** a quote; three backticks a code block.
 - In a list, **Tab** and **Shift+Tab** change the level.
@@ -60,9 +59,10 @@ The Edukors Text Editor writes documents laid out like Word's: an A4 page with 2
 ## Save and export
 
 - **Save** (Cmd+S) writes an .etex; **Shift+Cmd+S** saves under another name or folder.
-- A DOCX, Markdown, text, or HTML file is saved back into itself. The first Save asks, because what the editor does not support is lost (in a DOCX: colors, fonts, and sizes). A PDF opens as text only: Save asks where to save an .etex.
+- Markdown and text files can be saved in place. For DOCX and PDF, Save asks where to save an .etex.
 - In a Markdown file, the **Markdown source** switch shows and edits the file's own text.
-- **Export** makes an HTML page, a PDF (A4), Markdown, plain text, or a Word DOCX. **Show in folder** opens the document's folder.
+- **Export** makes a PDF (A4), plain text (.txt), or Markdown (.md). **Show in folder** opens the document's folder.
+- **Print** (Cmd+P) prints the document as in the PDF: A4, 20 mm margins.
 
 ## AI assistant
 
@@ -73,6 +73,7 @@ Connect an account in **Settings → AI assistant** (Claude Code or Codex, insta
 | Action | macOS | Windows and Linux |
 | --- | --- | --- |
 | Save, Save as | Cmd+S, Shift+Cmd+S | Ctrl+S, Shift+Ctrl+S |
+| Print | Cmd+P | Ctrl+P |
 | Undo, Redo | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y |
 | Bold, Italic, Underline | Cmd+B, Cmd+I, Cmd+U | Ctrl+B, Ctrl+I, Ctrl+U |
 | Strikethrough, Inline code | Shift+Cmd+X, Cmd+E | Shift+Ctrl+X, Ctrl+E |
@@ -82,16 +83,17 @@ Connect an account in **Settings → AI assistant** (Claude Code or Codex, insta
 | Close tab | Cmd+W | Ctrl+W |`,
       pt: `# Guia rápido
 
-O Edukors Text Editor escreve documentos com a página do Word: A4, margens de 20 mm. Os arquivos próprios dele são **.etex**; ele também abre e salva arquivos DOCX, Markdown, texto e HTML.
+O Edukors Text Editor escreve documentos com a página do Word: A4, margens de 20 mm. Os arquivos próprios dele são **.etex**; ele abre DOCX, Markdown, texto e PDF; os formatos de saída são .etex, .pdf, .txt e .md.
 
 ## Começar
 
 - **Novo** cria um documento vazio; cada documento fica numa aba, e o ponto na aba indica alterações não salvas.
-- **Abrir** lê um arquivo .etex, DOCX, Markdown, texto, PDF ou HTML. Um duplo clique num .etex no Finder ou no Explorer também o abre aqui.
+- **Abrir** lê um arquivo .etex, DOCX, Markdown, texto ou PDF. Um duplo clique num .etex no Finder ou no Explorer também o abre aqui.
 - **Recentes** lista os documentos salvos ou abertos mais recentemente.
 
 ## Escrever e formatar
 
+- **− / +** ajustam o zoom do documento sem alterar o tamanho das fontes salvas ou a interface.
 - A barra acima da página tem o estilo (parágrafo, títulos, citação, código), fonte, tamanho, cor, negrito, itálico, sublinhado, alinhamento, listas e links.
 - Enquanto digita: **# **, **## ** ou **### ** começam um título; **- ** uma lista com marcadores; **1. ** uma lista numerada; **> ** uma citação; três crases um bloco de código.
 - Numa lista, **Tab** e **Shift+Tab** mudam o nível.
@@ -110,9 +112,10 @@ O Edukors Text Editor escreve documentos com a página do Word: A4, margens de 2
 ## Salvar e exportar
 
 - **Salvar** (Cmd+S) grava um .etex; **Shift+Cmd+S** salva com outro nome ou em outra pasta.
-- Um arquivo DOCX, Markdown, texto ou HTML é salvo nele mesmo. O primeiro Salvar pergunta antes, porque o que o editor não suporta se perde (num DOCX: cores, fontes e tamanhos). Um PDF abre só como texto: Salvar pergunta onde salvar um .etex.
+- Arquivos Markdown e texto podem ser salvos neles mesmos. Para DOCX e PDF, Salvar pergunta onde salvar um .etex.
 - Num arquivo Markdown, a chave **Fonte Markdown** mostra e edita o texto do próprio arquivo.
-- **Exportar** gera uma página HTML, um PDF (A4), Markdown, texto simples ou um DOCX do Word. **Mostrar na pasta** abre a pasta do documento.
+- **Exportar** gera um PDF (A4), texto simples (.txt) ou Markdown (.md). **Mostrar na pasta** abre a pasta do documento.
+- **Imprimir** (Cmd+P) imprime o documento como no PDF: A4, margens de 20 mm.
 
 ## Assistente de IA
 
@@ -123,6 +126,7 @@ Conecte uma conta em **Configurações → Assistente de IA** (Claude Code ou Co
 | Ação | macOS | Windows e Linux |
 | --- | --- | --- |
 | Salvar, Salvar como | Cmd+S, Shift+Cmd+S | Ctrl+S, Shift+Ctrl+S |
+| Imprimir | Cmd+P | Ctrl+P |
 | Desfazer, Refazer | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y |
 | Negrito, Itálico, Sublinhado | Cmd+B, Cmd+I, Cmd+U | Ctrl+B, Ctrl+I, Ctrl+U |
 | Tachado, Código | Shift+Cmd+X, Cmd+E | Shift+Ctrl+X, Ctrl+E |
@@ -132,16 +136,17 @@ Conecte uma conta em **Configurações → Assistente de IA** (Claude Code ou Co
 | Fechar aba | Cmd+W | Ctrl+W |`,
       es: `# Guía rápida
 
-Edukors Text Editor escribe documentos con la página de Word: A4, márgenes de 20 mm. Sus archivos propios son **.etex**; también abre y guarda archivos DOCX, Markdown, texto y HTML.
+Edukors Text Editor escribe documentos con la página de Word: A4, márgenes de 20 mm. Sus archivos propios son **.etex**; abre DOCX, Markdown, texto y PDF; los formatos de salida son .etex, .pdf, .txt y .md.
 
 ## Empezar
 
 - **Nuevo** crea un documento vacío; cada documento ocupa una pestaña, y el punto en la pestaña indica cambios sin guardar.
-- **Abrir** lee un archivo .etex, DOCX, Markdown, texto, PDF o HTML. Un doble clic en un .etex en el Finder o el Explorador también lo abre aquí.
+- **Abrir** lee un archivo .etex, DOCX, Markdown, texto o PDF. Un doble clic en un .etex en el Finder o el Explorador también lo abre aquí.
 - **Recientes** lista los documentos guardados o abiertos más recientemente.
 
 ## Escribir y dar formato
 
+- **− / +** ajustan el zoom del documento sin cambiar las fuentes guardadas ni la interfaz.
 - La barra sobre la página tiene el estilo (párrafo, títulos, cita, código), fuente, tamaño, color, negrita, cursiva, subrayado, alineación, listas y enlaces.
 - Al escribir: **# **, **## ** o **### ** empiezan un título; **- ** una lista con viñetas; **1. ** una lista numerada; **> ** una cita; tres acentos graves un bloque de código.
 - En una lista, **Tab** y **Shift+Tab** cambian el nivel.
@@ -160,9 +165,10 @@ Edukors Text Editor escribe documentos con la página de Word: A4, márgenes de 
 ## Guardar y exportar
 
 - **Guardar** (Cmd+S) escribe un .etex; **Shift+Cmd+S** guarda con otro nombre o en otra carpeta.
-- Un archivo DOCX, Markdown, texto o HTML se guarda en sí mismo. El primer Guardar pregunta antes, porque lo que el editor no admite se pierde (en un DOCX: colores, fuentes y tamaños). Un PDF se abre solo como texto: Guardar pregunta dónde guardar un .etex.
+- Markdown y texto pueden guardarse en el archivo original. Para DOCX y PDF, Guardar pide dónde guardar un .etex.
 - En un archivo Markdown, el interruptor **Código Markdown** muestra y edita el texto del propio archivo.
-- **Exportar** genera una página HTML, un PDF (A4), Markdown, texto sin formato o un DOCX de Word. **Mostrar en la carpeta** abre la carpeta del documento.
+- **Exportar** genera un PDF (A4), texto sin formato (.txt) o Markdown (.md). **Mostrar en la carpeta** abre la carpeta del documento.
+- **Imprimir** (Cmd+P) imprime el documento como en el PDF: A4, márgenes de 20 mm.
 
 ## Asistente de IA
 
@@ -173,6 +179,7 @@ Conecte una cuenta en **Configuración → Asistente de IA** (Claude Code o Code
 | Acción | macOS | Windows y Linux |
 | --- | --- | --- |
 | Guardar, Guardar como | Cmd+S, Shift+Cmd+S | Ctrl+S, Shift+Ctrl+S |
+| Imprimir | Cmd+P | Ctrl+P |
 | Deshacer, Rehacer | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y |
 | Negrita, Cursiva, Subrayado | Cmd+B, Cmd+I, Cmd+U | Ctrl+B, Ctrl+I, Ctrl+U |
 | Tachado, Código | Shift+Cmd+X, Cmd+E | Shift+Ctrl+X, Ctrl+E |
@@ -198,7 +205,7 @@ The editor is free. There is no technical support, help desk, deadline for fixin
 
 ## No warranty
 
-The software is provided "as is", without warranty of any kind, express or implied, including merchantability, fitness for a particular purpose, and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the software or its use. Keep copies of your documents, especially before saving a DOCX, Markdown, text, or HTML file back into itself: what the editor does not support is lost.
+The software is provided "as is", without warranty of any kind, express or implied, including merchantability, fitness for a particular purpose, and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the software or its use. Keep copies of your documents, especially before saving a Markdown or text file back into itself: what the editor does not support is lost.
 
 ## Your documents and third-party services
 
@@ -238,7 +245,7 @@ O editor é gratuito. Não há suporte técnico, atendimento, prazo de correçã
 
 ## Sem garantia
 
-O software é fornecido "no estado em que se encontra", sem garantia de nenhum tipo, expressa ou implícita, inclusive de comercialização, de adequação a um fim específico e de não violação de direitos. Em nenhuma hipótese os autores ou titulares dos direitos respondem por reclamações, danos ou outras responsabilidades decorrentes do software ou do seu uso. Guarde cópias dos seus documentos, principalmente antes de salvar um arquivo DOCX, Markdown, texto ou HTML nele mesmo: o que o editor não suporta se perde.
+O software é fornecido "no estado em que se encontra", sem garantia de nenhum tipo, expressa ou implícita, inclusive de comercialização, de adequação a um fim específico e de não violação de direitos. Em nenhuma hipótese os autores ou titulares dos direitos respondem por reclamações, danos ou outras responsabilidades decorrentes do software ou do seu uso. Guarde cópias dos seus documentos, principalmente antes de salvar um arquivo Markdown ou texto nele mesmo: o que o editor não suporta se perde.
 
 ## Seus documentos e serviços de terceiros
 
@@ -280,7 +287,7 @@ El editor es gratuito. No hay soporte técnico, atención, plazo para corregir e
 
 ## Sin garantía
 
-El software se proporciona "tal cual", sin garantía de ningún tipo, expresa o implícita, incluidas las de comerciabilidad, idoneidad para un fin determinado y no infracción. En ningún caso los autores o titulares de los derechos serán responsables de reclamaciones, daños u otras responsabilidades derivadas del software o de su uso. Guarde copias de sus documentos, sobre todo antes de guardar un archivo DOCX, Markdown, texto o HTML en sí mismo: lo que el editor no admite se pierde.
+El software se proporciona "tal cual", sin garantía de ningún tipo, expresa o implícita, incluidas las de comerciabilidad, idoneidad para un fin determinado y no infracción. En ningún caso los autores o titulares de los derechos serán responsables de reclamaciones, daños u otras responsabilidades derivadas del software o de su uso. Guarde copias de sus documentos, sobre todo antes de guardar un archivo Markdown o texto en sí mismo: lo que el editor no admite se pierde.
 
 ## Sus documentos y servicios de terceros
 

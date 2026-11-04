@@ -58,7 +58,7 @@ test("DOCX: Word-readable, with headings, emphasis, links, and lists", async () 
   assert.match(html, /<a href="https:\/\/edukors\.org\/">/);
   assert.match(html, /<ul><li>clorofila<\/li><li>estômatos<\/li><\/ul>/);
   assert.match(html, /<ol><li>luz<\/li><li>água<\/li><\/ol>/);
-  assert.deepEqual(Object.keys(await exportDocument(sample.toJSON(), "docx", "Aula")), ["data"]);
+  await assert.rejects(exportDocument(sample.toJSON(), "docx", "Aula"), /Unknown export format/);
 });
 
 test("tables: GitHub Markdown out and back, tabs in text, Word tables in DOCX", async () => {
@@ -72,4 +72,10 @@ test("tables: GitHub Markdown out and back, tabs in text, Word tables in DOCX", 
   assert.equal(toText(doc), "Parte\tFunção\nFolha\tfotossíntese\nRaiz\tabsorção | água\n");
   const { value: html } = await mammoth.convertToHtml({ buffer: Buffer.from(await toDOCX(doc)) });
   assert.match(html, /<table><thead><tr><th><p>Parte<\/p><\/th><th><p>Função<\/p><\/th><\/tr><\/thead><tbody><tr><td><p><strong>Folha<\/strong><\/p><\/td>/);
+});
+
+// PDF needs the page's DOM (toHTML), so it is checked in the app.
+test("output formats are limited to PDF, plain text, and Markdown", async () => {
+  for (const format of ["html", "docx"]) await assert.rejects(exportDocument(sample.toJSON(), format), /Unknown export format/);
+  for (const format of ["txt", "md"]) assert.equal(typeof (await exportDocument(sample.toJSON(), format)).data, "string");
 });

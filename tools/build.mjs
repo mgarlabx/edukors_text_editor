@@ -1,10 +1,12 @@
 // Bundles the editor (src/editor, ProseMirror) into dist/editor.js, which Common's boot.js loads as one of the app's
 // scripts, and its styles into dist/editor.css. Run by npm start, npm test, and npm run package.
 import { build } from "esbuild";
+import { customizeCommon } from "./customize-common.mjs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+await customizeCommon();
 await mkdir(`${root}dist`, { recursive: true });
 await build({ entryPoints: [`${root}src/editor/index.js`], bundle: true, format: "iife", target: "chrome140", outfile: `${root}dist/editor.js`, minify: true, sourcemap: "linked", legalComments: "eof", logLevel: "warning" });
 const css = await Promise.all([

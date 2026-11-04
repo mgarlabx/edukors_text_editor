@@ -97,3 +97,5 @@
 .find-panel .tooltip { left: auto; right: 0; transform: none; }
 .text-page .search-match { border-radius: 2px; background: #ffe58f; }
 .text-page .search-match.is-current { background: #ffb347; box-shadow: 0 0 0 1px #e8890c; }
+
+.text-zoom-value { min-width: 4ch; text-align: center; font-variant-numeric: tabular-nums; }
