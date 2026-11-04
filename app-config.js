@@ -1,7 +1,7 @@
 // What makes this app the Text Editor inside the shared shell (Edukors Common, docs/common-shell.md "App integration").
 globalThis.EdukorsAppConfig = {
   name: 'Edukors Text Editor',
-  version: 'v.26.11.03',            // the release date; package.json holds the same date as 26.11.3
+  version: 'v.26.11.04',            // the release date; package.json holds the same date as 26.11.4
   // Version of the terms of use below. The app asks once per version; change it when the terms change.
   termsVersion: '2026-11-02.2',
   // No left sidebar (Common's placeholder panel and its toolbar toggle).

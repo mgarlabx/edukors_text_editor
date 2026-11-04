@@ -23,6 +23,7 @@ import { columnResizing, tableEditing, goToNextCell, isInTable, selectionCell, s
 import { pickTableSize, insertTable } from "./tables.js";
 import { media } from "./schema.js";
 import { searchPlugin, createFindBar, goToMatch, SEARCH_ICON } from "./search.js";
+import { lineSpacingPlugin } from "./spacing.js";
 
 const { nodes, marks } = schema;
 const mac = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform || "");
@@ -137,7 +138,7 @@ function keys() {
   if (!mac) map["Mod-y"] = redo;
   return [keymap(map), keymap(baseKeymap)];
 }
-const plugins = () => [columnResizing(), tableEditing(), rules(), ...keys(), history(), dropCursor(), gapCursor(), searchPlugin()];
+const plugins = () => [columnResizing(), tableEditing(), rules(), ...keys(), history(), dropCursor(), gapCursor(), searchPlugin(), lineSpacingPlugin()];
 const newState = (doc) => EditorState.create({ schema, doc, plugins: plugins() });
 
 // ---------- The surface ----------
