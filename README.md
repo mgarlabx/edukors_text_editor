@@ -7,13 +7,13 @@
 <p align="center">
   A text editor that runs on your computer, with an AI assistant at your side.<br>
   Documents are laid out like Word's, on an A4 page, and <strong>open and save DOCX, Markdown, text and PDF</strong>.<br>
-  Part of <a href="https://edukors.org"><strong>Edukors.org</strong></a>.
+  More information at <a href="https://edukors.org"><strong>edukors.org</strong></a>.
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Windows-coming%20soon-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows: coming soon">
   <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac"></a>
   <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/badge/Download-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux"></a>
-  <img src="https://img.shields.io/badge/Windows-coming%20soon-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows: coming soon">
 </p>
 
 <p align="center">
@@ -22,20 +22,18 @@
 </p>
 
 <p align="center">
-  <sub>Free, for macOS (Apple Silicon and Intel) and Linux (x64, AppImage); Windows through the Microsoft Store soon. See <a href="#download">Download</a> for the details.</sub>
+  <sub>Free, for macOS (Apple Silicon and Intel) and Linux (x64, AppImage); Windows 10/11 (x64) soon, through the Microsoft Store. See <a href="#download">Download</a> for the details.</sub>
 </p>
 
 ## Part of Edukors.org
 
 [Edukors.org](https://edukors.org) is a project of open tools for teaching and learning. The Text Editor is its word processor: made for teachers and writers who want a focused, Word-like page without depending on an online service or a heavy office suite.
 
-It shares its interface, AI accounts and skills with the other Edukors apps through [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), so what you learn in one works in all of them:
-
 <table>
   <tr>
     <td width="33%" valign="top">
       <h3>📝 Text Editor</h3>
-      <strong>This app</strong>, for documents: handouts, lesson plans, articles, reports.
+      <strong>This app</strong>, for documents laid out like Word's, opening and saving DOCX, Markdown, text and PDF.
     </td>
     <td width="33%" valign="top">
       <h3>🎞️ <a href="https://github.com/mgarlabx/edukors_slides_editor">Slides Editor</a></h3>
@@ -47,6 +45,18 @@ It shares its interface, AI accounts and skills with the other Edukors apps thro
     </td>
   </tr>
 </table>
+
+### One document, one file
+
+A document is saved in a single `.etex` file, a package laid out like a DOCX file, so it converts to and from Word. The editor also opens DOCX, Markdown, text and PDF files, and exports PDF, text and Markdown. It shares its interface, AI accounts and skills with the other Edukors apps through [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), so what you learn in one works in all of them.
+
+```mermaid
+flowchart LR
+    I["📥 Open<br/>.docx · .md · .txt · .pdf"] --> E["📝 Edukors Text Editor<br/><b>.etex</b>"]
+    E --> O["📤 Export<br/>.pdf · .txt · .md"]
+    E --> P["🖨️ Print"]
+    E <--> A["🤖 AI assistant"]
+```
 
 ## What it is for
 
@@ -83,14 +93,6 @@ It shares its interface, AI accounts and skills with the other Edukors apps thro
 
 ## How it works
 
-```mermaid
-flowchart LR
-    I["📥 Open<br/>.docx · .md · .txt · .pdf"] --> E["📝 Edukors Text Editor<br/><b>.etex</b>"]
-    E --> O["📤 Export<br/>.pdf · .txt · .md"]
-    E --> P["🖨️ Print"]
-    E <--> A["🤖 AI assistant"]
-```
-
 **The page.** A document is a continuous page with the measures of the PDF's A4 page (20 mm margins). Dashed marks with the page number show where each PDF page ends; the switch at the end of the formatting bar hides them. A mark can be one line early, because the PDF moves a line that does not fit to the next page. Zoom (− and +, 50% to 200%) changes only the view, never the saved font sizes.
 
 **Writing.** The formatting bar holds the style (paragraph, headings 1–3, quote, code), font, size in points, color, bold, italic, underline, strikethrough, subscript and superscript, alignment, lists and links. While typing, `# ` to `### ` start a heading, `- ` a bulleted list, `1. ` a numbered list, `> ` a quote and ```` ``` ```` a code block; in a list, Tab and Shift+Tab change the level. With the cursor in a link, a bubble shows its address; Cmd+click (Ctrl+click on Windows and Linux) opens it in the browser. Pasting from other programs keeps what a document can hold.
@@ -113,15 +115,13 @@ flowchart LR
 
 An `.etex` is a package laid out like a DOCX file, so it can be converted to and from Word: the document's content, its pictures and its AI conversations, checked strictly when opened. Double-clicking an `.etex` opens the editor. When saving over an existing file, the editor asks before replacing it.
 
-**Help and terms of use.** The Help button opens a quick guide and the terms of use (the MIT license, explained), which the editor asks you to accept the first time it opens. The interface is available in English, Portuguese and Spanish.
-
 ## Download
 
 | System | Download | Requirements |
 | --- | --- | --- |
+| **Windows** | Microsoft Store (coming soon) | Windows 10 or 11, 64-bit (x64) |
 | **macOS** | `Edukors-Text-Editor-<version>-mac.dmg` on the [latest release](https://github.com/mgarlabx/edukors_text_editor/releases/latest) | Apple Silicon or Intel (universal) |
 | **Linux** | `Edukors-Text-Editor-<version>-linux-x86_64.AppImage` on the [latest release](https://github.com/mgarlabx/edukors_text_editor/releases/latest) | 64-bit (x64) |
-| **Windows** | Microsoft Store (coming soon) | Windows 10 or 11, 64-bit (x64) |
 
 Every version is on the [releases](https://github.com/mgarlabx/edukors_text_editor/releases) page.
 
@@ -129,24 +129,40 @@ Every version is on the [releases](https://github.com/mgarlabx/edukors_text_edit
 
 **On Linux**, an `.AppImage` file. Make the file executable (`chmod +x`) and open it, no installation needed.
 
+**Help and terms of use.** The Help button opens a quick guide and the terms of use (the MIT license, explained), which the editor asks you to accept the first time it opens. The interface is available in English, Portuguese and Spanish.
+
 **Updates.** The app checks this repository's releases and says when a new version is out.
 
 **Optional: the AI assistant.** Install [Claude Code](https://claude.com/claude-code) (`claude`) or [Codex](https://developers.openai.com/codex/cli/) (`codex`) on your computer; the editor never downloads them for you. Then add an account in the editor and sign in. The accounts are shared with the other Edukors apps on this computer.
 
-## For developers
+## Building from source
 
-The app is built with [Electron](https://www.electronjs.org) and [ProseMirror](https://prosemirror.net), on top of [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared shell of the Edukors apps. Requirements: [Node.js](https://nodejs.org) 22.12 or later and npm.
+Requirements: [Node.js](https://nodejs.org) 22.12 or later, npm and git (Edukors Common is installed from its GitHub repository).
 
 ```sh
 git clone https://github.com/mgarlabx/edukors_text_editor.git
 cd edukors_text_editor
-npm install                             # Edukors Common comes from GitHub (main); .npmrc allows that one git dependency
+npm install
 node node_modules/electron/install.js   # once, if npm skipped Electron's download (npm 12 blocks install scripts)
 npm start                               # builds dist/ (tools/build.mjs), then opens the app
-npm test                                # builds, then runs tests/ (schema, file, Markdown, text, DOCX, AI operations, find and replace)
 ```
 
-`npm run build && npx electron . [--shared | --data-dir <dir>]` also opens the app. Unpackaged, the AI accounts live in a development registry apart from the other Edukors apps, with a fake service for testing; `--shared` uses the real shared accounts, `--data-dir` another folder. To work on Common at the same time, link the sibling folder: `npm link ../edukors_common_ux`. `npm run package` builds this system's installer into `release/`.
+`npm run package` builds this system's installer into `release/`. The published installers are built on GitHub by the release workflow that runs when a version tag is pushed (see [Releases](#releases)).
+
+## Project status
+
+The editor is young and evolving. It runs on macOS (universal: Apple Silicon and Intel), signed and notarized by Apple, and on Linux (x64). The Windows version (MSIX) is built by the release workflow and waits for its Microsoft Store listing.
+
+## For developers
+
+The app is built with [Electron](https://www.electronjs.org) and [ProseMirror](https://prosemirror.net) on [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared foundation of the Edukors apps, which provides the window, toolbar, tabs, files, settings, help, update notice and the AI assistant.
+
+```sh
+npm test                                # builds, then runs tests/ (schema, file, Markdown, text, DOCX, AI operations, find and replace)
+npm run build && npx electron . [--shared | --data-dir <dir>]
+```
+
+Unpackaged, the AI accounts live in a development registry apart from the other Edukors apps, with a fake service for testing; `--shared` uses the real shared accounts, `--data-dir` another folder. To work on Common at the same time, link the sibling folder: `npm link ../edukors_common_ux`.
 
 ### What this app supplies
 
