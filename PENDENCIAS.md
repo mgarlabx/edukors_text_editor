@@ -106,7 +106,15 @@ Center. O pacote está em `test-results/store-msix/`.
 - A release leva de 30 a 50 minutos, por causa da notarização. Sem o `PRODUCT_ID`, o job da Store só avisa e não
   envia nada, o que é esperado nesta primeira vez.
 
-### 6. Primeira submissão na Store (manual)
+### 6. Primeira submissão na Store (manual): ENVIADA para certificação em 2026-11-07
+
+Pacote 26.11.7, listagens pt/en/es com as capturas do Windows, política de privacidade em `PRIVACY.md`. A
+classificação etária reaproveitou o certificado IARC do Graph, como foi feito no Slides. Se a Microsoft recusar,
+basta responder o questionário IARC do Text.
+
+**Depois da aprovação:** no README, trocar "Microsoft Store (coming soon)" e o parágrafo "on its way" pelo link
+`https://apps.microsoft.com/detail/9N0QJKJJTJN6`, apontar o badge do Windows para a Store, como no Graph, e apagar
+este arquivo. As próximas versões vão sozinhas para a Store pelo job **store** da release.
 
 O `msstore` só troca o pacote de um app que já tem uma submissão. A primeira é feita à mão no Partner Center:
 
