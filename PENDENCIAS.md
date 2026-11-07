@@ -36,7 +36,10 @@ sites ou com credenciais que eu não posso acessar. Apague este arquivo quando t
 
 ## O que depende de você, em ordem
 
-### 1. Segredos da Apple no repositório do Text (notarização)
+### 1. Segredos da Apple no repositório do Text (notarização): FEITO em 2026-11-07
+
+Ambiente `release` criado (só tags `v*`, como no Slides) e os cinco segredos cadastrados. Os comandos abaixo ficam como
+referência.
 
 O repositório do Text não tem nenhum segredo. O GitHub não deixa ler os valores dos outros repositórios, então é
 preciso cadastrá-los de novo, com os arquivos do gerenciador de senhas:
