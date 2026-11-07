@@ -95,7 +95,11 @@ Na mesma ocasião foi corrigida a CI, que falhava desde 4/11 porque o Common pas
   roda em PRs que mudam os scripts de captura. As imagens do Windows ficam no artefato `store-screenshots` da execução.
 - Revisar as imagens e fazer o merge.
 
-### 5. Primeira release
+### 5. Primeira release: FEITO em 2026-11-07
+
+v26.11.7 publicada. O Mac foi notarizado ("accepted", "Notarized Developer ID"), e os links de download fixos
+funcionam. O job da Store falhou como esperado ("first submission"), mas deixou um rascunho de submissão no Partner
+Center. O pacote está em `test-results/store-msix/`.
 
 - Atualizar a versão em `package.json`, `app-config.js` e no lockfile (por exemplo, 26.11.7 e `v.26.11.07`), fazer
   commit e push, depois `git tag v26.11.7 && git push origin v26.11.7`.
