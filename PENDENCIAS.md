@@ -56,7 +56,11 @@ gh secret set APPLE_API_ISSUER -R $R -e release           # o Issuer ID (App Sto
 
 Recomendado: em **Settings → Environments → release**, exigir revisor, como no Slides.
 
-### 2. Reservar o app no Partner Center
+### 2. Reservar o app no Partner Center: FEITO em 2026-11-07
+
+Store ID **9N0QJKJJTJN6**, já em `store.yml`. Name e Publisher conferem com `electron-builder.yml`. Falta trocar o
+"coming soon" do README pelo link da Store, mas só depois que a primeira submissão for aprovada, porque antes disso a
+página não existe.
 
 1. Em partner.microsoft.com → **Apps and games → New product → MSIX or PWA app**, reserve o nome
    **Edukors Text Editor**.

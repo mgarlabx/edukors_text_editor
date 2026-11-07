@@ -32,7 +32,7 @@ permissions:
   actions: read
 
 env:
-  PRODUCT_ID: "" # the Store ID, e.g. 9N…, once the app is reserved in Partner Center
+  PRODUCT_ID: 9N0QJKJJTJN6 # the Store ID (Partner Center → Product identity)
 
 jobs:
   submit:

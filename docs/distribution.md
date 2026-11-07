@@ -96,4 +96,4 @@ These always download the latest published version:
 - Windows, installer: `https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-windows.exe`
 - Linux, AppImage: `https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.AppImage`
 - Linux, Debian/Ubuntu: `https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.deb`
-- Windows, Microsoft Store: `https://apps.microsoft.com/detail/<Store ID>` (once published)
+- Windows, Microsoft Store: `https://apps.microsoft.com/detail/9N0QJKJJTJN6` (Store ID 9N0QJKJJTJN6; the page works once the first submission is approved)
