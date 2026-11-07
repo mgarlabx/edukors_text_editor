@@ -29,6 +29,8 @@
 
 [Edukors.org](https://edukors.org) is a project of open tools for teaching and learning. The Text Editor is its word processor: made for teachers and writers who want a focused, Word-like page without depending on an online service or a heavy office suite.
 
+The Edukors editors form a **suite of three free apps** for teachers, each for one kind of material: **documents**, **presentations** and **adaptive courses**. They run on your computer, are installed separately, and share the AI accounts you connect, so signing in once serves all three.
+
 <table>
   <tr>
     <td width="33%" valign="top">
@@ -48,7 +50,7 @@
 
 ### One document, one file
 
-A document is saved in a single `.etex` file, a package laid out like a DOCX file, so it converts to and from Word. The editor also opens DOCX, Markdown, text and PDF files, and exports PDF, text and Markdown. It shares its interface, AI accounts and skills with the other Edukors apps through [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), so what you learn in one works in all of them.
+A document is saved in a single `.etex` file, a package laid out like a DOCX file, so it converts to and from Word. The editor also opens DOCX, Markdown, text and PDF files, and exports PDF, text and Markdown. Its interface, skills and AI accounts come from [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared foundation of the Edukors apps.
 
 ```mermaid
 flowchart LR
