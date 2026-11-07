@@ -71,7 +71,10 @@ página não existe.
    - **Store ID** (9N… ou 9P…): coloque em `PRODUCT_ID` no `.github/workflows/store.yml`.
 3. Me passe o Store ID e eu atualizo `store.yml`, o README (badge e link da Store) e `docs/distribution.md`.
 
-### 3. Segredos e variável do Partner Center no repositório do Text
+### 3. Segredos e variável do Partner Center no repositório do Text: FEITO em 2026-11-07
+
+Os quatro segredos e `STORE_AUTO_SUBMIT=true` estão cadastrados. O client secret é uma chave nova, criada no app Entra
+só para o Text em 2026-11-07, e vence em 2028.
 
 São os mesmos quatro valores usados no Slides e no Graph (app Entra "GitHub Actions - Edukors Store"):
 
