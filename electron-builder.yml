@@ -1,5 +1,6 @@
-# Installers: DMG (macOS, universal), MSIX (Windows), AppImage (Linux). Locally: npm run package (tools/package.mjs)
-# builds this system's installer into release/. Releases: .github/workflows/release.yml, from a tag vX.Y.Z.
+# Installers for macOS (DMG and ZIP, universal), Windows (NSIS .exe, and MSIX for the Microsoft Store) and Linux
+# (AppImage and .deb), as in the Slides and Graph Editors. Locally: npm run package (tools/package.mjs) builds this
+# system's installers into release/. Releases: .github/workflows/release.yml, from a tag vX.Y.Z.
 appId: org.edukors.text
 productName: Edukors Text Editor
 copyright: Copyright © 2026 Edukors
@@ -38,33 +39,46 @@ mac:
   target:
     - target: dmg
       arch: [universal]
+    - target: zip
+      arch: [universal]
+  artifactName: Edukors-Text-Editor-${version}-mac-${arch}.${ext}
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 dmg:
-  artifactName: Edukors-Text-Editor-${version}-mac.${ext}
+  artifactName: Edukors-Text-Editor-${version}-mac-${arch}.${ext}
 
 win:
   target:
+    - target: nsis
+      arch: [x64]
     - target: appx
       arch: [x64]
-# MSIX for the Microsoft Store (electron-builder calls the target "appx"). Replace the identity with the one from
-# Partner Center → Product identity once the app is reserved there; the Store signs and updates the package.
+  artifactName: Edukors-Text-Editor-${version}-setup.${ext}
+# Microsoft Store package (MSIX; electron-builder calls the target "appx"), which the Store signs. The publisher is the
+# Edukors Partner Center account's (the same as the Slides and Graph Editors'); identityName must be the one Partner
+# Center shows in Product management → Product identity once "Edukors Text Editor" is reserved (check it then).
 appx:
-  identityName: Edukors.EdukorsTextEditor
-  publisher: CN=Edukors
-  publisherDisplayName: Edukors
+  identityName: mgarlabx.EdukorsTextEditor
+  publisher: CN=25CB0A95-E013-4D6C-9667-81DF1CC50F46
+  publisherDisplayName: mgarlabx
   displayName: Edukors Text Editor
   applicationId: EdukorsTextEditor
   backgroundColor: transparent
-  languages: [en-US, pt-BR, es-ES, zh-CN, hi-IN]
+  languages: [en-US, pt-BR, es-ES]
+  # The Store takes MSIX packages only for Windows above 10.0.17134 (1803); Electron needs Windows 10 anyway.
   minVersion: 10.0.17763.0
   maxVersionTested: 10.0.26100.0
-  artifactName: Edukors-Text-Editor-${version}-windows-${arch}.msix
+  artifactName: Edukors-Text-Editor-${version}-${arch}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
 
 linux:
   target:
     - target: AppImage
+      arch: [x64]
+    - target: deb
       arch: [x64]
   category: Office
   executableName: edukors-text-editor

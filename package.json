@@ -39,6 +39,7 @@
     "mammoth": "1.13.0",
     "markdown-it": "14.3.3",
     "pdfjs-dist": "6.4.299",
+    "playwright": "1.64.1",
     "prosemirror-commands": "1.7.2",
     "prosemirror-dropcursor": "1.8.4",
     "prosemirror-gapcursor": "1.4.1",

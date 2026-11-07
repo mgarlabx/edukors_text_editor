@@ -11,9 +11,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Windows-coming%20soon-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows: coming soon">
-  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac"></a>
-  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/badge/Download-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux"></a>
+  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-windows.exe"><img src="https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows"></a>
+  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-mac.dmg"><img src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac"></a>
+  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.AppImage"><img src="https://img.shields.io/badge/Download-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux"></a>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <sub>Free, for macOS (Apple Silicon and Intel) and Linux (x64, AppImage); Windows 10/11 (x64) soon, through the Microsoft Store. See <a href="#download">Download</a> for the details.</sub>
+  <sub>Free, for Windows 10/11 (x64), macOS (Apple Silicon and Intel) and Linux (x64). See <a href="#download">Download</a> for the details.</sub>
 </p>
 
 ## Part of Edukors.org
@@ -122,14 +122,18 @@ An `.etex` is a package laid out like a DOCX file, so it can be converted to and
 | System | Download | Requirements |
 | --- | --- | --- |
 | **Windows** | Microsoft Store (coming soon) | Windows 10 or 11, 64-bit (x64) |
-| **macOS** | `Edukors-Text-Editor-<version>-mac.dmg` on the [latest release](https://github.com/mgarlabx/edukors_text_editor/releases/latest) | Apple Silicon or Intel (universal) |
-| **Linux** | `Edukors-Text-Editor-<version>-linux-x86_64.AppImage` on the [latest release](https://github.com/mgarlabx/edukors_text_editor/releases/latest) | 64-bit (x64) |
+| | [Edukors-Text-Editor-windows.exe](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-windows.exe) | The same, for schools that block the Microsoft Store |
+| **macOS** | [Edukors-Text-Editor-mac.dmg](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-mac.dmg) | Apple Silicon or Intel |
+| **Linux** | [Edukors-Text-Editor-linux.AppImage](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.AppImage) | 64-bit (x64) |
+| | [Edukors-Text-Editor-linux.deb](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.deb) | Optional, for Debian, Ubuntu, Mint and their relatives |
 
-Every version is on the [releases](https://github.com/mgarlabx/edukors_text_editor/releases) page.
+The links always give the latest version; every version is on the [releases](https://github.com/mgarlabx/edukors_text_editor/releases) page. Each release lists the SHA-256 checksum of every file (`SHA256SUMS.txt`) and carries a GitHub build provenance attestation (`gh attestation verify <file> -R mgarlabx/edukors_text_editor`).
+
+**On Windows**, the Microsoft Store version is on its way. Meanwhile, or if your school blocks the Store, download the `.exe` installer. Windows may show security warnings: in the browser, keep the file; on the **Windows protected your PC** warning, click **More info** and then **Run anyway**.
 
 **On macOS**, a `.dmg` file, signed and notarized by Apple. Open the file and drag the app into the **Applications** folder.
 
-**On Linux**, an `.AppImage` file. Make the file executable (`chmod +x`) and open it, no installation needed.
+**On Linux**, an `.AppImage` file. Make the file executable (`chmod +x`) and open it, no installation needed. On Debian, Ubuntu and their relatives, the `.deb` is an alternative that adds the editor to the applications menu and opens `.etex` files with a double click: `sudo apt install ./Edukors-Text-Editor-linux.deb`.
 
 **Help and terms of use.** The Help button opens a quick guide and the terms of use (the MIT license, explained), which the editor asks you to accept the first time it opens. The interface is available in English, Portuguese and Spanish.
 
@@ -149,11 +153,11 @@ node node_modules/electron/install.js   # once, if npm skipped Electron's downlo
 npm start                               # builds dist/ (tools/build.mjs), then opens the app
 ```
 
-`npm run package` builds this system's installer into `release/`. The published installers are built on GitHub by the release workflow that runs when a version tag is pushed (see [Releases](#releases)).
+`npm run package` builds this system's installers into `release/`. The published installers, for all three systems, are built on GitHub by the release workflow that runs when a version tag is pushed; signing, notarization, releases and the Microsoft Store package are described in [docs/distribution.md](docs/distribution.md).
 
 ## Project status
 
-The editor is young and evolving. It runs on macOS (universal: Apple Silicon and Intel), signed and notarized by Apple, and on Linux (x64). The Windows version (MSIX) is built by the release workflow and waits for its Microsoft Store listing.
+The editor is young and evolving. It runs on macOS (universal: Apple Silicon and Intel), signed and notarized by Apple, on Windows (x64; the installer on GitHub is not signed, and the signed version comes through the Microsoft Store) and on Linux (x64).
 
 ## For developers
 
@@ -184,18 +188,13 @@ Everything else comes from Common (see its `docs/common-shell.md`, "App integrat
 | `assistant.js` | The AI assistant's instructions and tools (their argument types) |
 | `desktop/main.mjs` | `startDesktopApp` from Common with this app's id, name and extension |
 | `electron-builder.yml`, `build/` | Installers, icon (`build/icon.svg`; `npm run icons` renders the PNGs), macOS entitlements |
+| `tools/` | `build.mjs` (the bundle), `package.mjs` (installers), `public-installers.mjs` (fixed download names), `store-screenshots.mjs` and `store-sample.mjs` (Microsoft Store pictures) |
 
 `src/editor/` is bundled by esbuild into `dist/editor.js` and `dist/editor.css` (`tools/build.mjs`).
 
 ### Releases
 
-Versions are release dates: `package.json` 26.11.4 is `v.26.11.04` in `app-config.js`; keep both the same.
-
-1. Set the version in `package.json` and `app-config.js`, commit, and push.
-2. `git tag v26.11.4 && git push origin v26.11.4`.
-3. `.github/workflows/release.yml` installs the **latest Edukors Common** (its `main`), runs the tests, builds a DMG (macOS, universal, signed and notarized), an AppImage (Linux) and an MSIX (Windows, kept as a workflow artifact for the Microsoft Store), and publishes the DMG and AppImage in a GitHub release. The app checks that repository's releases for updates (`"edukors": { "updates": … }` in `package.json`).
-
-Signing secrets, in the repository's `release` environment: `MAC_CERT_P12` (base64 Developer ID Application certificate), `MAC_CERT_PASSWORD`, `APPLE_API_KEY` (base64 `.p8`), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`. Without them, macOS builds are signed ad hoc. The MSIX identity in `electron-builder.yml` is a placeholder until the app is reserved in Partner Center.
+Versions are release dates: `package.json` 26.11.4 is `v.26.11.04` in `app-config.js`; keep both the same. Set the version, commit, push, then `git tag v26.11.4 && git push origin v26.11.4`: `.github/workflows/release.yml` tests against the **latest Edukors Common**, builds, signs and notarizes the installers, publishes them in a GitHub release, and sends the MSIX to the Microsoft Store (`.github/workflows/store.yml`). The details, secrets included, are in [docs/distribution.md](docs/distribution.md).
 
 ## License
 
