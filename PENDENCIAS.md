@@ -86,7 +86,10 @@ gh variable set STORE_AUTO_SUBMIT -R $R -b true    # o mesmo que o Slides e o Gr
 
 O client secret vem do gerenciador de senhas ou de **Partner Center → app Entra → Keys**.
 
-### 4. Push do branch e capturas no Windows
+### 4. Push do branch e capturas no Windows: FEITO em 2026-11-07
+
+PR #1 com merge no `main`. As capturas do Windows estão em `test-results/store-screenshots-windows/` (no `.gitignore`).
+Na mesma ocasião foi corrigida a CI, que falhava desde 4/11 porque o Common passou a mostrar só Cancelar / Substituir.
 
 - `git push -u origin store-release` e abrir um PR. O PR dispara a CI e o workflow "Store screenshots", porque ele
   roda em PRs que mudam os scripts de captura. As imagens do Windows ficam no artefato `store-screenshots` da execução.
