@@ -1,59 +1,184 @@
-# Edukors Text Editor
+<p align="center">
+  <img src="build/icon.png" alt="" width="112">
+</p>
 
-A text editor for Edukors, built on [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared base of the Edukors apps. Documents are `.etex` packages laid out like DOCX files, so they can be converted to and from Word.
+<h1 align="center">Edukors Text Editor</h1>
 
-**Status:** the editor works. A document is a continuous page with the measures of the PDF's A4 page (20 mm margins); dashed marks with the page number show where each PDF page ends (the switch at the end of the formatting bar hides them; the choice is kept on the computer). A mark can be one line early: the PDF moves a line that does not fit to the next page.
+<p align="center">
+  A text editor that runs on your computer, with an AI assistant at your side.<br>
+  Documents are laid out like Word's, on an A4 page, and <strong>open and save DOCX, Markdown, text and PDF</strong>.<br>
+  Part of <a href="https://edukors.org"><strong>Edukors.org</strong></a>.
+</p>
 
-- **Editing** (ProseMirror): paragraphs, headings 1–3, quotes, code blocks, bulleted and numbered lists (Tab and Shift+Tab change the level), horizontal rules (from imported documents), bold, italic, underline, strikethrough, subscript and superscript, inline code, links, font, size (points), color, and alignment. The formatting bar is Common's (`blockStyle`, `text`, `align`, `lists`, `link`). Links: with the cursor in a link, a bubble shows its address (click it to open); Cmd+click (Ctrl+click on Windows and Linux) opens a link at once, in the system's browser. Markdown-style shortcuts while typing: `# ` to `### `, `- `, `1. `, `> `, ```` ``` ````. Undo and redo per document; the Edit buttons (Undo, Redo, Cut, Copy, Paste, Delete) and the macOS menu act on the editor; pasting from other programs keeps what a document can hold.
-- **Find and replace** (`src/editor/search.js`; Cmd+F or the magnifier at the end of the formatting bar; Option+Cmd+F, Ctrl+H on Windows and Linux, with the replace field): a panel at the top right of the page; matches highlighted in every block (never across two), the current one counted ("2 of 9"); Enter and Shift+Enter, Cmd+G and Shift+Cmd+G (F3, Shift+F3) move between them; match case and whole words; Replace keeps the formatting of the replaced text, Replace all is one undo step. It searches the formatted text, so it closes in the Markdown source. The left sidebar is off (`sidebar: false` in `app-config.js`).
-- **Tables** (Insert table: a grid to pick rows × columns; the first row is a header row): typing in cells, Tab and Shift+Tab between cells, column widths by dragging borders, and, in the bar's Table group (a menu in groups: rows, columns, deleting rows and columns, merging and splitting, header row, deleting the table) and cell fill.
-- **Shapes and pictures** (Insert group of the main toolbar): a shape from Common's ten (`EdukorsShapes`), or a picture file (PNG, JPEG, GIF, WebP, SVG, BMP, AVIF; up to 50 MB). Both are blocks between paragraphs, aligned left, center, or right; selected, they show a resize handle (pictures keep their proportions; shapes when Keep proportions is on), and the bar shows alignment and, for shapes, line width, style, and color, fill, shadow, keep proportions, and opacity.
-- **Save and Open** `.etex` documents. Input formats: `.etex`, `.docx`, `.txt`, `.md`, `.pdf`. Markdown and plain text can be saved in place; DOCX and PDF use Save As `.etex`. Markdown files can also be edited as source.
-- When saving over an existing file, the dialog offers **Cancel** and **Replace**.
-- **Export:** PDF (A4, 20 mm margins), plain text (`.txt`), and Markdown (`.md`). Native documents are saved as `.etex`.
-- **Print** (button after Export in the main toolbar; Cmd+P, Ctrl+P on Windows and Linux): the system's print dialog with the same page as the PDF export.
-- **Reading other formats:** DOCX, Markdown, plain text, and PDF (text only). Imported content is validated against the document schema.
-- **Document zoom:** − and + in the formatting bar, from 50% to 200%. The view preference is kept on this computer and does not change document formatting or interface size.
-- **Help:** a quick guide and the terms of use (the MIT license, explained; asked once per `termsVersion`), in English, Portuguese, and Spanish (`app-config.js`, `help`); other interface languages show English.
-- **AI assistant** (`assistant.js`, operations in `src/editor/ai.js`): reads the document as numbered blocks with their Markdown, and changes it with tools: `insert_content` and `replace_blocks` (Markdown), `set_block_style` (paragraph, headings, quote, code; alignment), `format_text` (bold, italic, underline, strikethrough, code, color, size, font, link on exact text or whole blocks), `replace_text`, `insert_shape`, `insert_image` (a file in the document's folder or an attachment, a web address, or SVG). Each change is one undo step of the conversation's document and, in Review mode, waits for approval.
+<p align="center">
+  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac"></a>
+  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/badge/Download-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux"></a>
+  <img src="https://img.shields.io/badge/Windows-coming%20soon-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows: coming soon">
+</p>
 
-## Run
+<p align="center">
+  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest"><img src="https://img.shields.io/github/v/release/mgarlabx/edukors_text_editor?label=latest" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+</p>
 
-```sh
-npm install                          # Edukors Common comes from GitHub (main); .npmrc allows that one git dependency
-node node_modules/electron/install.js   # once, if npm skipped Electron's download (npm 12 blocks install scripts)
-npm start                            # builds dist/ (tools/build.mjs), then opens the app; or: npm run build && npx electron . [--shared | --data-dir <dir>]
-npm test                             # builds, then runs tests/ (schema, file, Markdown, text, DOCX, AI operations, find and replace)
+<p align="center">
+  <sub>Free, for macOS (Apple Silicon and Intel) and Linux (x64, AppImage); Windows through the Microsoft Store soon. See <a href="#download">Download</a> for the details.</sub>
+</p>
+
+## Part of Edukors.org
+
+[Edukors.org](https://edukors.org) is a project of open tools for teaching and learning. The Text Editor is its word processor: made for teachers and writers who want a focused, Word-like page without depending on an online service or a heavy office suite.
+
+It shares its interface, AI accounts and skills with the other Edukors apps through [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), so what you learn in one works in all of them:
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>📝 Text Editor</h3>
+      <strong>This app</strong>, for documents: handouts, lesson plans, articles, reports.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🎞️ <a href="https://github.com/mgarlabx/edukors_slides_editor">Slides Editor</a></h3>
+      For presentations, exported as a single HTML file that opens offline.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🗺️ <a href="https://github.com/mgarlabx/edukors_graph_editor">Graph Editor</a></h3>
+      For adaptive courses in the <a href="https://github.com/mgarlabx/edukors_graph">Edukors Graph</a> format.
+    </td>
+  </tr>
+</table>
+
+## What it is for
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>✍️ Write</h3>
+      Headings, lists, quotes, code, links, fonts, colors and alignment, with Markdown shortcuts while you type.
+    </td>
+    <td width="33%" valign="top">
+      <h3>📄 See the page</h3>
+      A continuous A4 page with 20 mm margins, and marks where each PDF page ends.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🧩 Insert</h3>
+      Tables (merge, split, fill), shapes and pictures, resized and aligned right on the page.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>🔎 Find and replace</h3>
+      Match case and whole words; replacing keeps the formatting, and Replace all is a single undo.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🤖 Ask the AI</h3>
+      Ask the assistant to write, rewrite, format, or add shapes and pictures; you approve each change.
+    </td>
+    <td width="33%" valign="top">
+      <h3>📦 Export and print</h3>
+      PDF, plain text or Markdown, and printing with the same page as the PDF.
+    </td>
+  </tr>
+</table>
+
+## How it works
+
+```mermaid
+flowchart LR
+    I["📥 Open<br/>.docx · .md · .txt · .pdf"] --> E["📝 Edukors Text Editor<br/><b>.etex</b>"]
+    E --> O["📤 Export<br/>.pdf · .txt · .md"]
+    E --> P["🖨️ Print"]
+    E <--> A["🤖 AI assistant"]
 ```
 
-Unpackaged, the AI accounts live in a development registry apart from the other Edukors apps, with a fake service for testing (`--shared` uses the real shared accounts; `--data-dir` another folder). To work on Common at the same time, link the sibling folder: `npm link ../edukors_common_ux`.
+**The page.** A document is a continuous page with the measures of the PDF's A4 page (20 mm margins). Dashed marks with the page number show where each PDF page ends; the switch at the end of the formatting bar hides them. A mark can be one line early, because the PDF moves a line that does not fit to the next page. Zoom (− and +, 50% to 200%) changes only the view, never the saved font sizes.
 
-## What this app supplies
+**Writing.** The formatting bar holds the style (paragraph, headings 1–3, quote, code), font, size in points, color, bold, italic, underline, strikethrough, subscript and superscript, alignment, lists and links. While typing, `# ` to `### ` start a heading, `- ` a bulleted list, `1. ` a numbered list, `> ` a quote and ```` ``` ```` a code block; in a list, Tab and Shift+Tab change the level. With the cursor in a link, a bubble shows its address; Cmd+click (Ctrl+click on Windows and Linux) opens it in the browser. Pasting from other programs keeps what a document can hold.
+
+**Tables, shapes and pictures.** Insert table offers a grid to pick rows × columns (the first row is a header). Tab moves between cells, borders drag to change column widths, and the Table menu adds, deletes, merges and splits rows and columns, toggles the header row and sets the cell fill. Shapes come from Edukors' catalog of ten; pictures can be PNG, JPEG, GIF, WebP, SVG, BMP or AVIF, up to 50 MB. Both sit between paragraphs, aligned left, center or right, with a resize handle; shapes also take line width, style and color, fill, shadow and opacity.
+
+**Find and replace.** Cmd+F (Ctrl+F), or the magnifier at the end of the bar, opens a panel at the top right; Option+Cmd+F (Ctrl+H) adds the replace field. Matches are highlighted and counted ("2 of 9"); Enter and Shift+Enter, or Cmd+G and Shift+Cmd+G (F3 and Shift+F3), move between them.
+
+**The AI assistant.** A panel reads the document as numbered blocks and changes it with tools: inserting and replacing content, setting block styles, formatting text, replacing text, and inserting shapes and pictures (a file, a web address or SVG). Each change is one undo step and, in Review mode, waits for your approval. The assistant runs on **Claude Code** or **Codex**, installed on your computer, with an AI account you connect in the editor; accounts, skills and conversations are shared with the other Edukors apps. Each document keeps its own conversations.
+
+**Files.**
+
+| Format | Open | Save | Export |
+| --- | :---: | :---: | :---: |
+| **`.etex`** (the editor's own) | ✅ | ✅ | |
+| **DOCX** | ✅ | Save As `.etex` | |
+| **Markdown** (`.md`) | ✅ | ✅ in place, or as source | ✅ |
+| **Plain text** (`.txt`) | ✅ | ✅ in place | ✅ |
+| **PDF** | ✅ text only | Save As `.etex` | ✅ A4, 20 mm margins |
+
+An `.etex` is a package laid out like a DOCX file, so it can be converted to and from Word: the document's content, its pictures and its AI conversations, checked strictly when opened. Double-clicking an `.etex` opens the editor. When saving over an existing file, the editor asks before replacing it.
+
+**Help and terms of use.** The Help button opens a quick guide and the terms of use (the MIT license, explained), which the editor asks you to accept the first time it opens. The interface is available in English, Portuguese and Spanish.
+
+## Download
+
+| System | Download | Requirements |
+| --- | --- | --- |
+| **macOS** | `Edukors-Text-Editor-<version>-mac.dmg` on the [latest release](https://github.com/mgarlabx/edukors_text_editor/releases/latest) | Apple Silicon or Intel (universal) |
+| **Linux** | `Edukors-Text-Editor-<version>-linux-x86_64.AppImage` on the [latest release](https://github.com/mgarlabx/edukors_text_editor/releases/latest) | 64-bit (x64) |
+| **Windows** | Microsoft Store (coming soon) | Windows 10 or 11, 64-bit (x64) |
+
+Every version is on the [releases](https://github.com/mgarlabx/edukors_text_editor/releases) page.
+
+**On macOS**, a `.dmg` file, signed and notarized by Apple. Open the file and drag the app into the **Applications** folder.
+
+**On Linux**, an `.AppImage` file. Make the file executable (`chmod +x`) and open it, no installation needed.
+
+**Updates.** The app checks this repository's releases and says when a new version is out.
+
+**Optional: the AI assistant.** Install [Claude Code](https://claude.com/claude-code) (`claude`) or [Codex](https://developers.openai.com/codex/cli/) (`codex`) on your computer; the editor never downloads them for you. Then add an account in the editor and sign in. The accounts are shared with the other Edukors apps on this computer.
+
+## For developers
+
+The app is built with [Electron](https://www.electronjs.org) and [ProseMirror](https://prosemirror.net), on top of [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared shell of the Edukors apps. Requirements: [Node.js](https://nodejs.org) 22.12 or later and npm.
+
+```sh
+git clone https://github.com/mgarlabx/edukors_text_editor.git
+cd edukors_text_editor
+npm install                             # Edukors Common comes from GitHub (main); .npmrc allows that one git dependency
+node node_modules/electron/install.js   # once, if npm skipped Electron's download (npm 12 blocks install scripts)
+npm start                               # builds dist/ (tools/build.mjs), then opens the app
+npm test                                # builds, then runs tests/ (schema, file, Markdown, text, DOCX, AI operations, find and replace)
+```
+
+`npm run build && npx electron . [--shared | --data-dir <dir>]` also opens the app. Unpackaged, the AI accounts live in a development registry apart from the other Edukors apps, with a fake service for testing; `--shared` uses the real shared accounts, `--data-dir` another folder. To work on Common at the same time, link the sibling folder: `npm link ../edukors_common_ux`. `npm run package` builds this system's installer into `release/`.
+
+### What this app supplies
 
 Everything else comes from Common (see its `docs/common-shell.md`, "App integration"):
 
-| File | Role |
+| Path | Role |
 | --- | --- |
-| `index.html` | loads `app-config.js`, then Common's `src/shell/boot.js` with this app's scripts |
-| `app-config.js` | name, version (`v.YY.MM.DD`), terms version, `.etex`, export and import formats, help texts |
-| `src/editor/` | the editor, bundled by esbuild into `dist/editor.js` and `dist/editor.css` (`tools/build.mjs`): `schema.js` (what a document may contain, every attribute validated), `index.js` (the editing surface, formatting bar, Edit and Insert buttons), `media.js` (pictures and shapes on the page), `tables.js` (Insert table's size grid), `pages.js` (page-break marks), `search.js` (find and replace), `ai.js` (the assistant's operations), `convert.js` (export and import), `editor.css` (the page) |
-| `document.js` | `EdukorsAppDocument`: the `.etex` package (`text/document.json` with the editor's content, pictures in `text/media/`, AI conversations), checked strictly when opened; export and import through the editor |
-| `assistant.js` | the AI assistant's instructions and tools (their argument types; `src/editor/ai.js` does the changes) |
-| `desktop/main.mjs` | `startDesktopApp` from Common with this app's id, name, and extension |
-| `electron-builder.yml`, `build/` | installers, icon (`build/icon.svg`; `npm run icons` renders the PNGs), macOS entitlements |
+| `index.html` | Loads `app-config.js`, then Common's `src/shell/boot.js` with this app's scripts |
+| `app-config.js` | Name, version (`v.YY.MM.DD`), terms version, `.etex`, export and import formats, help texts; `sidebar: false` turns off the left sidebar |
+| `src/editor/schema.js` | What a document may contain, every attribute validated |
+| `src/editor/index.js` | The editing surface, formatting bar, Edit and Insert buttons |
+| `src/editor/media.js`, `tables.js` | Pictures and shapes on the page; Insert table's size grid |
+| `src/editor/pages.js`, `search.js` | Page-break marks; find and replace |
+| `src/editor/ai.js` | The assistant's operations |
+| `src/editor/convert.js`, `editor.css` | Export and import; the page's styles |
+| `document.js` | `EdukorsAppDocument`: the `.etex` package (`text/document.json`, pictures in `text/media/`, AI conversations), export and import through the editor |
+| `assistant.js` | The AI assistant's instructions and tools (their argument types) |
+| `desktop/main.mjs` | `startDesktopApp` from Common with this app's id, name and extension |
+| `electron-builder.yml`, `build/` | Installers, icon (`build/icon.svg`; `npm run icons` renders the PNGs), macOS entitlements |
 
-## Releases
+`src/editor/` is bundled by esbuild into `dist/editor.js` and `dist/editor.css` (`tools/build.mjs`).
 
-Versions are release dates: `package.json` 26.11.2 is `v.26.11.02` in `app-config.js`; keep both the same.
+### Releases
+
+Versions are release dates: `package.json` 26.11.4 is `v.26.11.04` in `app-config.js`; keep both the same.
 
 1. Set the version in `package.json` and `app-config.js`, commit, and push.
-2. `git tag v26.11.2 && git push origin v26.11.2`.
-3. `.github/workflows/release.yml` installs the **latest Edukors Common** (its `main`), runs the tests, builds a DMG (macOS, universal, signed and notarized), an AppImage (Linux), and an MSIX (Windows, kept as a workflow artifact for the Microsoft Store), and publishes the DMG and AppImage in a GitHub release. The app checks that repository's releases for updates (`"edukors": { "updates": … }` in `package.json`).
+2. `git tag v26.11.4 && git push origin v26.11.4`.
+3. `.github/workflows/release.yml` installs the **latest Edukors Common** (its `main`), runs the tests, builds a DMG (macOS, universal, signed and notarized), an AppImage (Linux) and an MSIX (Windows, kept as a workflow artifact for the Microsoft Store), and publishes the DMG and AppImage in a GitHub release. The app checks that repository's releases for updates (`"edukors": { "updates": … }` in `package.json`).
 
 Signing secrets, in the repository's `release` environment: `MAC_CERT_P12` (base64 Developer ID Application certificate), `MAC_CERT_PASSWORD`, `APPLE_API_KEY` (base64 `.p8`), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`. Without them, macOS builds are signed ad hoc. The MSIX identity in `electron-builder.yml` is a placeholder until the app is reserved in Partner Center.
 
-`npm run package` builds this system's installer locally into `release/`.
-
 ## License
 
-MIT
+[MIT](LICENSE). Copyright (c) 2026 Edukors.
