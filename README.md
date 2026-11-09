@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-windows.exe"><img src="https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows"></a>
+  <a href="https://apps.microsoft.com/detail/9N0QJKJJTJN6"><img src="https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows"></a>
   <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-mac.dmg"><img src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac"></a>
   <a href="https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.AppImage"><img src="https://img.shields.io/badge/Download-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux"></a>
 </p>
@@ -121,7 +121,7 @@ An `.etex` is a package laid out like a DOCX file, so it can be converted to and
 
 | System | Download | Requirements |
 | --- | --- | --- |
-| **Windows** | Microsoft Store (coming soon) | Windows 10 or 11, 64-bit (x64) |
+| **Windows** | [Microsoft Store](https://apps.microsoft.com/detail/9N0QJKJJTJN6) | Windows 10 or 11, 64-bit (x64) |
 | | [Edukors-Text-Editor-windows.exe](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-windows.exe) | The same, for schools that block the Microsoft Store |
 | **macOS** | [Edukors-Text-Editor-mac.dmg](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-mac.dmg) | Apple Silicon or Intel |
 | **Linux** | [Edukors-Text-Editor-linux.AppImage](https://github.com/mgarlabx/edukors_text_editor/releases/latest/download/Edukors-Text-Editor-linux.AppImage) | 64-bit (x64) |
@@ -129,7 +129,7 @@ An `.etex` is a package laid out like a DOCX file, so it can be converted to and
 
 The links always give the latest version; every version is on the [releases](https://github.com/mgarlabx/edukors_text_editor/releases) page. Each release lists the SHA-256 checksum of every file (`SHA256SUMS.txt`) and carries a GitHub build provenance attestation (`gh attestation verify <file> -R mgarlabx/edukors_text_editor`).
 
-**On Windows**, the Microsoft Store version is on its way. Meanwhile, or if your school blocks the Store, download the `.exe` installer. Windows may show security warnings: in the browser, keep the file; on the **Windows protected your PC** warning, click **More info** and then **Run anyway**.
+**On Windows**, it is available in the Microsoft Store: open the editor's page in the store and click **Install**. Does your school block the Microsoft Store? Download the `.exe` installer. Outside the store, Windows may still show security warnings, even though the app is approved: in the browser, keep the file; on the **Windows protected your PC** warning, click **More info** and then **Run anyway**.
 
 **On macOS**, a `.dmg` file, signed and notarized by Apple. Open the file and drag the app into the **Applications** folder.
 
@@ -157,7 +157,7 @@ npm start                               # builds dist/ (tools/build.mjs), then o
 
 ## Project status
 
-The editor is young and evolving. It runs on macOS (universal: Apple Silicon and Intel), signed and notarized by Apple, on Windows (x64; the installer on GitHub is not signed, and the signed version comes through the Microsoft Store) and on Linux (x64).
+The editor is young and evolving. It runs on macOS (universal: Apple Silicon and Intel), signed and notarized by Apple, on Windows (x64), signed through the Microsoft Store (the installer on GitHub is not signed) and on Linux (x64).
 
 ## For developers
 
