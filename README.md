@@ -7,6 +7,7 @@
 <p align="center">
   A text editor that runs on your computer, with an AI assistant at your side.<br>
   Documents are laid out like Word's, on an A4 page, and <strong>open and save DOCX, Markdown, text and PDF</strong>.<br>
+  Code and plain-text files (Python, SQL, JavaScript, TypeScript, HTML, CSS, JSON, CSV…) open in a code view.<br>
   More information at <a href="https://edukors.org"><strong>edukors.org</strong></a>.
 </p>
 
@@ -35,7 +36,7 @@ The Edukors editors form a **suite of three free apps** for teachers, each for o
   <tr>
     <td width="33%" valign="top">
       <h3>📝 Text Editor</h3>
-      <strong>This app</strong>, for documents laid out like Word's, opening and saving DOCX, Markdown, text and PDF.
+      <strong>This app</strong>, for documents laid out like Word's, opening and saving DOCX, Markdown, text and PDF, and for code and plain-text files.
     </td>
     <td width="33%" valign="top">
       <h3>🎞️ <a href="https://github.com/mgarlabx/edukors_slides_editor">Slides Editor</a></h3>
@@ -50,11 +51,12 @@ The Edukors editors form a **suite of three free apps** for teachers, each for o
 
 ### One document, one file
 
-A document is saved in a single `.etex` file, a package laid out like a DOCX file, so it converts to and from Word. The editor also opens DOCX, Markdown, text and PDF files, and exports PDF, text and Markdown. Its interface, skills and AI accounts come from [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared foundation of the Edukors apps.
+A document is saved in a single `.etex` file, a package laid out like a DOCX file, so it converts to and from Word. The editor also opens DOCX, Markdown and PDF files, and code and plain-text files, and exports PDF, text and Markdown. Its interface, skills and AI accounts come from [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared foundation of the Edukors apps.
 
 ```mermaid
 flowchart LR
-    I["📥 Open<br/>.docx · .md · .txt · .pdf"] --> E["📝 Edukors Text Editor<br/><b>.etex</b>"]
+    I["📥 Open<br/>.docx · .md · .pdf"] --> E["📝 Edukors Text Editor<br/><b>.etex</b>"]
+    C["💻 Code and plain text<br/>.txt · .py · .sql · .js · .ts · .html · .css · .json · .csv …"] <--> K["🧑‍💻 Code view<br/>saved as it was"]
     E --> O["📤 Export<br/>.pdf · .txt · .md"]
     E --> P["🖨️ Print"]
     E <--> A["🤖 AI assistant"]
@@ -91,6 +93,20 @@ flowchart LR
       PDF, plain text or Markdown, and printing with the same page as the PDF.
     </td>
   </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>💻 Edit code</h3>
+      Code and plain-text files over the whole window, with line numbers, syntax colors, folding and line wrapping.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🔢 Count the selection</h3>
+      The status bar shows the characters and words of the selected text.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🔗 Join lines</h3>
+      The selected lines become one paragraph, with single spaces between them.
+    </td>
+  </tr>
 </table>
 
 ## How it works
@@ -103,6 +119,10 @@ flowchart LR
 
 **Find and replace.** Cmd+F (Ctrl+F), or the magnifier at the end of the bar, opens a panel at the top right; Option+Cmd+F (Ctrl+H) adds the replace field. Matches are highlighted and counted ("2 of 9"); Enter and Shift+Enter, or Cmd+G and Shift+Cmd+G (F3 and Shift+F3), move between them.
 
+**Code and plain-text files.** A `.txt`, `.log`, `.csv`, `.tsv`, `.py`, `.php`, `.phtml`, `.sql`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.html`, `.htm`, `.css`, `.json`, `.xml`, `.svg`, `.yaml`, `.yml`, `.sh`, `.toml` or `.ini` file opens in a code view ([CodeMirror](https://codemirror.net)) instead of the page. It fills the document area in the colors of the light or dark theme, with line numbers, syntax colors, and chevrons that fold blocks (JSON objects and lists, functions, classes, HTML elements; plain text by indentation). The icon at the end of the bar turns line wrapping on and off, and the choice is kept. Find and replace is CodeMirror's panel. Saving writes the file back with its encoding (UTF-8, UTF-16, or Windows-1252), byte order mark and line endings; a file saved without changes keeps its exact bytes. The assistant can read these files but does not change them.
+
+**Selection and lines.** With text selected, in any document, the status bar shows its characters and words. **Join lines** (the icon at the end of the bar, or Shift+Cmd+J, Shift+Ctrl+J) makes the selected lines one paragraph, with single spaces between them: paragraphs and line breaks in a formatted document, keeping the formatting, or lines of a code file.
+
 **The AI assistant.** A panel reads the document as numbered blocks and changes it with tools: inserting and replacing content, setting block styles, formatting text, replacing text, and inserting shapes and pictures (a file, a web address or SVG). Each change is one undo step and, in Review mode, waits for your approval. The assistant runs on **Claude Code** or **Codex**, installed on your computer, with an AI account you connect in the editor; accounts, skills and conversations are shared with the other Edukors apps. Each document keeps its own conversations.
 
 **Files.**
@@ -112,7 +132,8 @@ flowchart LR
 | **`.etex`** (the editor's own) | ✅ | ✅ | |
 | **DOCX** | ✅ | Save As `.etex` | |
 | **Markdown** (`.md`) | ✅ | ✅ in place, or as source | ✅ |
-| **Plain text** (`.txt`) | ✅ | ✅ in place | ✅ |
+| **Plain text** (`.txt`) | ✅ code view | ✅ in place, as it was | ✅ |
+| **Code and data** (`.py`, `.php`, `.phtml`, `.sql`, `.js`, `.ts`, `.html`, `.css`, `.json`, `.csv`, and more) | ✅ code view | ✅ in place, as it was | |
 | **PDF** | ✅ text only | Save As `.etex` | ✅ A4, 20 mm margins |
 
 An `.etex` is a package laid out like a DOCX file, so it can be converted to and from Word: the document's content, its pictures and its AI conversations, checked strictly when opened. Double-clicking an `.etex` opens the editor. When saving over an existing file, the editor asks before replacing it.
@@ -161,10 +182,10 @@ The editor is young and evolving. It runs on macOS (universal: Apple Silicon and
 
 ## For developers
 
-The app is built with [Electron](https://www.electronjs.org) and [ProseMirror](https://prosemirror.net) on [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared foundation of the Edukors apps, which provides the window, toolbar, tabs, files, settings, help, update notice and the AI assistant.
+The app is built with [Electron](https://www.electronjs.org), [ProseMirror](https://prosemirror.net) and [CodeMirror](https://codemirror.net) on [Edukors Common](https://github.com/mgarlabx/edukors_common_ux), the shared foundation of the Edukors apps, which provides the window, toolbar, tabs, files, settings, help, update notice and the AI assistant.
 
 ```sh
-npm test                                # builds, then runs tests/ (schema, file, Markdown, text, DOCX, AI operations, find and replace)
+npm test                                # builds, then runs tests/ (schema, file, Markdown, text, DOCX, AI operations, find and replace, code files, join lines, selection count)
 npm run build && npx electron . [--shared | --data-dir <dir>]
 ```
 
@@ -182,6 +203,8 @@ Everything else comes from Common (see its `docs/common-shell.md`, "App integrat
 | `src/editor/index.js` | The editing surface, formatting bar, Edit and Insert buttons |
 | `src/editor/media.js`, `tables.js` | Pictures and shapes on the page; Insert table's size grid |
 | `src/editor/pages.js`, `search.js` | Page-break marks; find and replace |
+| `src/editor/code.js`, `code-text.js` | The code view (CodeMirror) for plain-text files; their extensions, encodings and line endings |
+| `src/editor/join.js`, `stats.js` | Join lines; the selection count in the status bar |
 | `src/editor/ai.js` | The assistant's operations |
 | `src/editor/convert.js`, `editor.css` | Export and import; the page's styles |
 | `document.js` | `EdukorsAppDocument`: the `.etex` package (`text/document.json`, pictures in `text/media/`, AI conversations), export and import through the editor |

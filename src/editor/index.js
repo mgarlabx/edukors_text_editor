@@ -24,6 +24,11 @@ import { pickTableSize, insertTable } from "./tables.js";
 import { media } from "./schema.js";
 import { searchPlugin, createFindBar, goToMatch, SEARCH_ICON } from "./search.js";
 import { lineSpacingPlugin } from "./spacing.js";
+import { newCodeState, createCodeView, wraps, setWrap, setPhrases, joinCodeLines, selectedText, undo as codeUndo, redo as codeRedo,
+  undoDepth as codeUndoDepth, redoDepth as codeRedoDepth, openSearchPanel, closeSearchPanel, searchPanelOpen } from "./code.js";
+import { decodeText, encodeText } from "./code-text.js";
+import { joinLines } from "./join.js";
+import { countText } from "./stats.js";
 
 const { nodes, marks } = schema;
 const mac = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform || "");
@@ -133,6 +138,7 @@ function keys() {
     "Shift-Enter": chainCommands(exitCode, (state, dispatch) => { if (dispatch) dispatch(state.tr.replaceSelectionWith(nodes.hard_break.create()).scrollIntoView()); return true; }),
     // In a table, Tab and Shift+Tab move between cells; in a list they change the level.
     Enter: splitListItem(nodes.list_item), Tab: chainCommands(goToNextCell(1), sinkListItem(nodes.list_item)), "Shift-Tab": chainCommands(goToNextCell(-1), liftListItem(nodes.list_item)),
+    "Mod-Shift-j": joinLines,
     "Mod-Alt-0": setBlockType(nodes.paragraph), "Mod-Alt-1": setBlockType(nodes.heading, { level: 1 }), "Mod-Alt-2": setBlockType(nodes.heading, { level: 2 }), "Mod-Alt-3": setBlockType(nodes.heading, { level: 3 }),
   };
   if (!mac) map["Mod-y"] = redo;
@@ -147,10 +153,31 @@ let view = null, active = null, toolbar = null;
 const format = {};
 const page = () => document.getElementById("document-placeholder");
 const editOf = (doc) => (doc.editor ??= { state: newState(doc.text ? docFromJSON(doc.text) : emptyDoc()), saved: null });
+// This app's own labels (Common's translations hold the shared ones); other languages fall back to English.
+const LABELS = {
+  en: { wrap: "Wrap long lines", join: "Join lines into one paragraph", chars: ["character", "characters"], words: ["word", "words"] },
+  pt: { wrap: "Quebrar linhas longas", join: "Unir linhas em um parágrafo", chars: ["caractere", "caracteres"], words: ["palavra", "palavras"] },
+  es: { wrap: "Ajustar líneas largas", join: "Unir líneas en un párrafo", chars: ["carácter", "caracteres"], words: ["palabra", "palabras"] },
+};
+const lang = () => document.documentElement.lang;
+const label = (key) => (LABELS[lang()] || LABELS.en)[key] ?? LABELS.en[key];
+
+// ---------- Code view (src/editor/code.js) ----------
+// A plain-text file (code, data, notes; src/editor/code-text.js lists the extensions) opens in the code view instead
+// of the page: editor.code = { state (CodeMirror), savedDoc (the text as last opened or saved), bytes (the file's
+// bytes then, written again while the text has not changed), ext, eol, bom, encoding }. Its ProseMirror state stays
+// empty and is never shown.
+const isCode = (doc) => !!doc?.editor?.code;
+const codeOn = () => isCode(active);
+let codeView = null, codeHost = null;
+const codeJSON = (text) => ({ type: "doc", content: [text ? { type: "code_block", content: [{ type: "text", text }] } : { type: "code_block" }] });
+// Long lines wrap by default; the choice is kept on this computer.
+const WRAP_KEY = "edukors.text.wrap";
+let wrapLines = (() => { try { return localStorage.getItem(WRAP_KEY) !== "false"; } catch { return true; } })();
 
 function markModified(doc) {
   const editor = editOf(doc);
-  const modified = !editor.state.doc.eq(editor.saved ?? emptyDoc());
+  const modified = editor.code ? !editor.code.state.doc.eq(editor.code.savedDoc) : !editor.state.doc.eq(editor.saved ?? emptyDoc());
   if (modified === !!doc.modified) return;
   doc.modified = modified;
   document.dispatchEvent(new CustomEvent("edukors:document-modified", { detail: { id: doc.id } }));
@@ -158,7 +185,7 @@ function markModified(doc) {
 
 // What the selection is: a picture, a shape, or text. The format bar shows the groups for it.
 const kindOf = (state) => (state.selection instanceof NodeSelection && (state.selection.node.type === nodes.image || state.selection.node.type === nodes.shape) ? state.selection.node.type.name : "text");
-const GROUPS = { source: [], text: ["blockStyle", "text", "align", "lists", "link"], table: ["blockStyle", "text", "align", "lists", "link", "table"], image: ["align"], shape: ["shape", "align"] };
+const GROUPS = { source: [], code: [], text: ["blockStyle", "text", "align", "lists", "link"], table: ["blockStyle", "text", "align", "lists", "link", "table"], image: ["align"], shape: ["shape", "align"] };
 const TABLE_ACTIONS = { addRowBefore, addRowAfter, addColumnBefore, addColumnAfter, deleteRow, deleteColumn, mergeCells, splitCell, toggleHeaderRow, deleteTable };
 // The format bar's kind: a picture, a shape, text in a table (adds the table group), or text.
 const barKind = (state) => { const kind = kindOf(state); return kind === "text" && isInTable(state) ? "table" : kind; };
@@ -237,13 +264,21 @@ function zoomControls() {
     return button;
   });
   function refresh() {
-    page().style.zoom = String(textZoom / 100);
+    applyZoom();
     label.textContent = `${textZoom}%`;
     buttons[0].disabled = textZoom <= 50;
     buttons[1].disabled = textZoom >= 200;
   }
   refresh();
   return [buttons[0], label, buttons[1]];
+}
+// The page is zoomed as a whole; the code view fills the document area, so only its text grows (--code-zoom).
+function applyZoom() {
+  const host = page();
+  if (!host) return;
+  host.style.zoom = codeOn() ? "" : String(textZoom / 100);
+  host.style.setProperty("--code-zoom", String(textZoom / 100));
+  codeView?.requestMeasure();
 }
 
 // Page breaks: shown by default; the choice is kept on this computer.
@@ -268,7 +303,48 @@ function breaksButton() {
   });
   return button;
 }
-const renderBreaks = () => { if (view) renderPageBreaks(page(), view.dom, showBreaks && !sourceOn(), (n) => t("pageNumber").replace("{n}", n)); };
+const renderBreaks = () => { if (view) renderPageBreaks(page(), view.dom, showBreaks && !sourceOn() && !codeOn(), (n) => t("pageNumber").replace("{n}", n)); };
+
+// Line wrapping in the code view (the icon of Common's graph-Wrap): applies to every open file.
+const WRAP_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h13.5a3 3 0 0 1 0 6H13M4 18h5"/><path d="m15 16-2 2 2 2"/></svg>';
+function wrapButton() {
+  const button = viewButton("wrap", WRAP_ICON, label("wrap"));
+  button.setAttribute("aria-pressed", String(wrapLines));
+  button.addEventListener("click", () => {
+    wrapLines = !wrapLines;
+    try { localStorage.setItem(WRAP_KEY, String(wrapLines)); } catch { /* kept for this session only */ }
+    button.setAttribute("aria-pressed", String(wrapLines));
+    if (codeView && codeOn()) codeView.dispatch({ effects: setWrap(wrapLines) });
+  });
+  return button;
+}
+// Join lines (Shift+Cmd+J, Shift+Ctrl+J): the selected lines become one paragraph, with single spaces between them.
+const JOIN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h7M3 12h7M3 18h7"/><path d="m10 6 4 6-4 6"/><path d="M14 12h7"/></svg>';
+const JOIN_KEYS = mac ? "⇧⌘J" : "Shift+Ctrl+J";
+function joinButton() {
+  const button = viewButton("joinLines", JOIN_ICON, `${label("join")} (${JOIN_KEYS})`);
+  button.setAttribute("aria-label", label("join"));
+  button.setAttribute("aria-keyshortcuts", mac ? "Shift+Meta+J" : "Shift+Control+J");
+  button.addEventListener("click", runJoin);
+  return button;
+}
+const canJoin = () => (codeOn() ? !!codeView && codeView.state.selection.ranges.some((range) => !range.empty) : !!view && !sourceOn() && joinLines(view.state));
+function runJoin() {
+  if (codeOn() && codeView) { joinCodeLines(codeView); codeView.focus(); }
+  else if (view && !sourceOn()) { joinLines(view.state, view.dispatch); view.focus(); }
+}
+// An icon button of the bar's last group that keeps the selection in the text when clicked.
+function viewButton(control, icon, tooltip) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "format-button icon";
+  button.dataset.control = control;
+  button.setAttribute("aria-label", tooltip);
+  button.innerHTML = `${icon}<span class="tooltip" aria-hidden="true"></span>`;
+  button.querySelector(".tooltip").textContent = tooltip;
+  button.addEventListener("mousedown", (event) => event.preventDefault());
+  return button;
+}
 
 // ---------- Markdown source ----------
 // A document read from a Markdown file can be edited as its source. editor.markdown = { text, doc }: the Markdown text
@@ -304,10 +380,11 @@ function renderSource() {
       if (!active.modified) { active.modified = true; document.dispatchEvent(new CustomEvent("edukors:document-modified", { detail: { id: active.id } })); }
       grow();
     });
+    for (const type of ["select", "keyup", "mouseup", "input"]) sourceArea.addEventListener(type, renderStats);
     page().append(sourceArea);
   }
   if (sourceArea) { sourceArea.hidden = !on; sourceArea.setAttribute("aria-label", t("markdownSource")); }
-  if (view) view.dom.style.display = on ? "none" : "";
+  if (view) view.dom.style.display = on || codeOn() ? "none" : "";
   if (on && sourceArea.value !== editOf(active).source) { sourceArea.value = editOf(active).source; sourceArea.scrollTop = 0; }
   if (on) grow();
 }
@@ -316,7 +393,7 @@ function setSource(on) {
   const e = editOf(active);
   if (on) { findBar.close({ focus: false }); e.source = sourceOf(active); }
   else { applySource(active); e.source = null; }
-  renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
+  renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks(); renderStats();
   if (on) sourceArea.focus(); else view.focus();
 }
 const SOURCE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>';
@@ -337,7 +414,7 @@ function sourceButton() {
 // ---------- Find and replace (src/editor/search.js) ----------
 // The panel floats at the top right of the page. It searches the formatted text, so it closes in the Markdown source.
 const findBar = createFindBar({
-  t, view: () => (view && !sourceOn() ? view : null),
+  t, view: () => (view && !sourceOn() && !codeOn() ? view : null),
   toast: (message) => EdukorsFileDialogs.toast({ t, message }),
   onChange() {
     document.querySelector('.context-toolbar [data-control="find"]')?.setAttribute("aria-pressed", String(findBar.isOpen));
@@ -356,7 +433,11 @@ function findButton() {
   button.innerHTML = `${SEARCH_ICON}<span class="tooltip" aria-hidden="true"></span>`;
   button.querySelector(".tooltip").textContent = `${t("findReplace")} (${mac ? "⌘F" : "Ctrl+F"})`;
   button.addEventListener("mousedown", (event) => event.preventDefault());
-  button.addEventListener("click", () => (findBar.isOpen ? findBar.close() : findBar.open()));
+  button.addEventListener("click", () => {
+    // The code view has its own find panel (CodeMirror's), at the top of the file.
+    if (codeOn() && codeView) { if (searchPanelOpen(codeView.state)) closeSearchPanel(codeView); else openSearchPanel(codeView); return; }
+    if (findBar.isOpen) findBar.close(); else findBar.open();
+  });
   return button;
 }
 // Cmd+F (Ctrl+F) finds; Option+Cmd+F (Ctrl+H) also shows the replace field; Cmd+G and Shift+Cmd+G (F3 and Shift+F3)
@@ -365,6 +446,10 @@ document.addEventListener("keydown", (event) => {
   if (!view || sourceOn() || document.querySelector("dialog[open]")) return;
   const mod = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   const replace = mac ? mod && event.altKey && event.code === "KeyF" : mod && !event.altKey && event.code === "KeyH";
+  if (codeOn()) {
+    if (codeView && (replace || (mod && !event.altKey && !event.shiftKey && event.code === "KeyF"))) { event.preventDefault(); event.stopPropagation(); openSearchPanel(codeView); }
+    return;
+  }
   if (replace || (mod && !event.altKey && !event.shiftKey && event.code === "KeyF")) { event.preventDefault(); findBar.open({ replace }); return; }
   if (findBar.isOpen && ((mod && !event.altKey && event.code === "KeyG") || event.key === "F3")) {
     event.preventDefault();
@@ -448,16 +533,18 @@ let toolbarKind = null;
 function renderToolbar() {
   const bar = document.getElementById("context-toolbar"), slot = document.getElementById("context-slot");
   if (!view) { slot.classList.remove("is-open", "is-settled"); slot.inert = true; toolbar = null; toolbarKind = null; bar.replaceChildren(); return; }
-  const kind = sourceOn() ? "source" : barKind(view.state), key = `${kind}${isMarkdown(active) ? ":md" : ""}`;
+  const kind = codeOn() ? "code" : sourceOn() ? "source" : barKind(view.state), key = `${kind}${isMarkdown(active) ? ":md" : ""}`;
   readFormat(view.state);
   if (!toolbar || key !== toolbarKind) {
     bar.setAttribute("aria-label", t("contextToolbar"));
-    // The shared groups render into their own holder; the page-break switch sits at the end of the bar.
+    // The shared groups render into their own holder; the view controls sit at the end of the bar: zoom, find, page
+    // breaks (line wrapping in the code view), join lines, and the Markdown source switch.
     const groups = document.createElement("div");
     groups.className = "text-format-groups";
     const end = document.createElement("div");
     end.className = "format-group text-view-group";
-    end.append(...zoomControls(), ...(kind === "source" ? [] : [findButton()]), breaksButton(), ...(isMarkdown(active) ? [sourceButton()] : []));
+    end.append(...zoomControls(), ...(kind === "source" ? [] : [findButton()]), kind === "code" ? wrapButton() : breaksButton(),
+      ...(kind === "source" ? [] : [joinButton()]), ...(isMarkdown(active) ? [sourceButton()] : []));
     bar.replaceChildren(groups, end);
     toolbar = EdukorsFormat.render(groups, {
       groups: GROUPS[kind], state: format, t, onChange: onFormat,
@@ -467,6 +554,44 @@ function renderToolbar() {
     slot.classList.add("is-open", "is-settled");
     slot.inert = false;
   } else toolbar.refresh();
+  const join = bar.querySelector('[data-control="joinLines"]');
+  if (join) join.disabled = !canJoin();
+  if (codeOn() && codeView) bar.querySelector('[data-control="find"]')?.setAttribute("aria-pressed", String(searchPanelOpen(codeView.state)));
+}
+
+// ---------- Selection count (footer) ----------
+// The characters and words of the selected text, in the status bar before the version; nothing without a selection.
+const statsLabel = (() => {
+  const bar = document.querySelector(".statusbar");
+  if (!bar) return null;
+  const span = document.createElement("span");
+  span.className = "text-selection-stats";
+  span.hidden = true;
+  const version = bar.querySelector(".version");
+  if (version) version.before(span); else bar.append(span);
+  return span;
+})();
+let statsTimer = 0;
+function selectionText() {
+  if (!active) return "";
+  if (codeOn()) return codeView ? selectedText(codeView.state) : "";
+  if (sourceOn()) return sourceArea && !sourceArea.hidden ? sourceArea.value.slice(sourceArea.selectionStart, sourceArea.selectionEnd) : "";
+  if (!view) return "";
+  const { state } = view;
+  return state.selection.ranges.filter((range) => range.$from.pos < range.$to.pos).map((range) => state.doc.textBetween(range.$from.pos, range.$to.pos, "\n", "\n")).join("\n");
+}
+// Counting a long selection takes a moment, so it waits until the selection stops changing.
+function renderStats() {
+  if (!statsLabel) return;
+  clearTimeout(statsTimer);
+  statsTimer = setTimeout(() => {
+    const text = selectionText();
+    if (!text) { statsLabel.hidden = true; statsLabel.textContent = ""; return; }
+    const { chars, words } = countText(text), number = (n) => n.toLocaleString(lang() || undefined);
+    const [char, chars_] = label("chars"), [word, words_] = label("words");
+    statsLabel.textContent = `${number(chars)} ${chars === 1 ? char : chars_} · ${number(words)} ${words === 1 ? word : words_}`;
+    statsLabel.hidden = false;
+  }, 60);
 }
 
 // ---------- Links ----------
@@ -507,8 +632,11 @@ function renderBubble() {
 const EDIT = ["undo", "redo", "cut", "copy", "paste", "delete"];
 const editButton = (key) => document.querySelector(`#edit-actions [data-command="${key}"]`);
 function renderEdit() {
-  const state = sourceOn() ? null : view?.state; // the source editor has its own undo and clipboard
-  const available = state ? { undo: undoDepth(state) > 0, redo: redoDepth(state) > 0, cut: !state.selection.empty, copy: !state.selection.empty, paste: true, delete: !state.selection.empty } : {};
+  const code = codeOn() && codeView ? codeView.state : null;
+  const state = sourceOn() || code ? null : view?.state; // the source editor has its own undo and clipboard
+  const selected = code && code.selection.ranges.some((range) => !range.empty);
+  const available = code ? { undo: codeUndoDepth(code) > 0, redo: codeRedoDepth(code) > 0, cut: selected, copy: selected, paste: true, delete: selected }
+    : state ? { undo: undoDepth(state) > 0, redo: redoDepth(state) > 0, cut: !state.selection.empty, copy: !state.selection.empty, paste: true, delete: !state.selection.empty } : {};
   for (const key of [...EDIT, "duplicate"]) {
     const button = editButton(key);
     if (!button) continue;
@@ -517,6 +645,18 @@ function renderEdit() {
 }
 async function runEdit(key) {
   if (!view) return;
+  if (codeOn() && codeView) {
+    codeView.focus();
+    if (key === "undo") codeUndo(codeView);
+    else if (key === "redo") codeRedo(codeView);
+    else if (key === "delete") codeView.dispatch({ ...codeView.state.replaceSelection(""), userEvent: "delete.selection", scrollIntoView: true });
+    else if (key === "cut" || key === "copy") document.execCommand(key);
+    else if (key === "paste") {
+      try { const text = await navigator.clipboard.readText(); if (text) codeView.dispatch({ ...codeView.state.replaceSelection(text.replace(/\r\n?/g, "\n")), userEvent: "input.paste", scrollIntoView: true }); }
+      catch { /* the clipboard could not be read: nothing to paste */ }
+    }
+    return;
+  }
   view.focus();
   if (key === "undo") undo(view.state, view.dispatch);
   else if (key === "redo") redo(view.state, view.dispatch);
@@ -536,22 +676,22 @@ for (const key of EDIT) editButton(key)?.addEventListener("click", () => runEdit
 // Insert: a shape from Common's picker, under the button; a picture from a file.
 const insertButton = (key) => document.querySelector(`#insert-actions [data-command="${key}"]`);
 insertButton("insertTable")?.addEventListener("click", () => {
-  if (!view) return;
+  if (!view || codeOn() || sourceOn()) return;
   const anchor = insertButton("insertTable").getBoundingClientRect(), target = view;
   pickTableSize({ x: anchor.left, y: anchor.bottom + 6, t, restoreFocus: view.dom, onPick: (rows, cols) => { if (view === target) insertTable(view, rows, cols); } });
 });
 insertButton("insertShape")?.addEventListener("click", () => {
-  if (!view) return;
+  if (!view || codeOn() || sourceOn()) return;
   const anchor = insertButton("insertShape").getBoundingClientRect(), target = view;
   EdukorsShapes.pick({ x: anchor.left, y: anchor.bottom + 6, t, restoreFocus: view.dom, onPick: (type) => { if (view === target) insertShape(view, type); } });
 });
 insertButton("insertImage")?.addEventListener("click", () => {
-  if (view) insertImageFromFile(view, (name) => EdukorsFileDialogs.toast({ t, message: EdukorsFileDialogs.fill(t("importFailed"), { name, reason: t("importNotImage") }) }));
+  if (view && !codeOn() && !sourceOn()) insertImageFromFile(view, (name) => EdukorsFileDialogs.toast({ t, message: EdukorsFileDialogs.fill(t("importFailed"), { name, reason: t("importNotImage") }) }));
 });
 function renderInsert() {
   for (const key of ["insertTable", "insertShape", "insertImage"]) {
     const button = insertButton(key);
-    if (button) { if (view && !sourceOn()) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true"); }
+    if (button) { if (view && !sourceOn() && !codeOn()) button.removeAttribute("aria-disabled"); else button.setAttribute("aria-disabled", "true"); }
   }
 }
 
@@ -563,18 +703,51 @@ const fitBelowBar = new ResizeObserver(() => {
 });
 fitBelowBar.observe(document.getElementById("context-toolbar"));
 
+// The code view of the active file: made the first time a file shows, then given each file's state in turn (with the
+// wrapping and the labels' language as they are now). The ProseMirror view is hidden meanwhile (renderSource).
+function onCodeUpdate(cmView, transactions) {
+  if (!codeOn()) return;
+  editOf(active).code.state = cmView.state;
+  if (transactions.some((tr) => tr.docChanged)) markModified(active);
+  renderEdit(); renderToolbar(); renderStats();
+}
+function renderCode() {
+  const code = active && editOf(active).code;
+  if (code && !codeView) {
+    codeHost = document.createElement("div");
+    codeHost.className = "code-surface";
+    page().append(codeHost);
+    codeView = createCodeView(codeHost, code.state, onCodeUpdate);
+  }
+  if (!codeHost) return;
+  codeHost.hidden = !code;
+  if (!code) return;
+  const effects = [];
+  if (wraps(code.state) !== wrapLines) effects.push(setWrap(wrapLines));
+  if (code.lang !== lang()) { effects.push(setPhrases(lang())); code.lang = lang(); }
+  if (effects.length) code.state = code.state.update({ effects }).state;
+  if (codeView.state !== code.state) {
+    codeView.setState(code.state);
+    if (code.scroll) codeView.dispatch({ effects: code.scroll });
+  }
+}
+
 function show(doc) {
   const host = page();
   // Leaving a document shown as source: the source goes into it, and it shows formatted next time.
   if (active && active !== doc && sourceOn()) { applySource(active); editOf(active).source = null; }
+  // Leaving a file in the code view: where it was scrolled to is kept for when it shows again.
+  if (active && active !== doc && codeOn() && codeView) editOf(active).code.scroll = codeView.scrollSnapshot();
   if (!doc) {
     findBar.close({ focus: false });
-    view?.destroy(); view = null; active = null; renderToolbar(); renderEdit(); renderInsert(); renderBubble();
+    view?.destroy(); view = null; codeView?.destroy(); codeView = null; codeHost = null;
+    active = null; renderToolbar(); renderEdit(); renderInsert(); renderBubble(); renderStats();
     renderPageBreaks(host, null, false);
-    host.classList.remove("text-page");
+    host.classList.remove("text-page", "code-page");
+    host.style.zoom = "";
     host.replaceChildren();
     sourceArea = null;
-    document.querySelector(".workspace")?.classList.remove("text-workspace");
+    document.querySelector(".workspace")?.classList.remove("text-workspace", "code-workspace");
     document.querySelector(".document-body").style.marginTop = "";
     return;
   }
@@ -582,7 +755,10 @@ function show(doc) {
   editor.saved ??= editor.state.doc;
   active = doc;
   host.classList.add("text-page");
+  host.classList.toggle("code-page", !!editor.code);
   document.querySelector(".workspace")?.classList.add("text-workspace");
+  document.querySelector(".workspace")?.classList.toggle("code-workspace", !!editor.code);
+  if (editor.code) findBar.close({ focus: false });
   if (!view) {
     host.replaceChildren();
     sourceArea = null;
@@ -603,7 +779,7 @@ function show(doc) {
         view.updateState(state);
         editOf(active).state = state;
         if (tr.docChanged) markModified(active);
-        renderToolbar(); renderEdit(); renderBubble();
+        renderToolbar(); renderEdit(); renderBubble(); renderStats();
         if (tr.docChanged) renderBreaks();
         findBar.refresh();
       },
@@ -612,7 +788,7 @@ function show(doc) {
     // Pictures that finish loading, and wrapping text, change the height: the page-break marks follow.
     new ResizeObserver(() => renderBreaks()).observe(view.dom);
   } else view.updateState(editor.state);
-  renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks();
+  renderCode(); renderSource(); renderToolbar(); renderEdit(); renderInsert(); renderBreaks(); renderStats(); applyZoom();
   findBar.sync();
   document.querySelector(".document-body").style.marginTop = `${document.getElementById("context-toolbar").offsetHeight}px`;
 }
@@ -621,12 +797,21 @@ document.addEventListener("edukors:documents-changed", (event) => show(event.det
 document.addEventListener("scroll", () => renderBubble(), true);
 addEventListener("resize", () => renderBubble());
 // After a save, the saved content is the baseline for "modified".
-document.addEventListener("edukors:document-saved", (event) => { const doc = event.detail.doc; editOf(doc).saved = editOf(doc).state.doc; markModified(doc); });
-document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderToolbar(); findBar.labels(); printLabels(); });
+// A file saved in its own format: the text and bytes written are the new baseline (exportFor keeps them).
+document.addEventListener("edukors:document-saved", (event) => {
+  const doc = event.detail.doc, code = editOf(doc).code;
+  if (code) {
+    if (code.written && doc.originFormat) { code.savedDoc = code.written.doc; code.bytes = code.written.bytes; }
+    else code.savedDoc = code.state.doc;
+    code.written = null;
+  } else editOf(doc).saved = editOf(doc).state.doc;
+  markModified(doc);
+});
+document.addEventListener("edukors:preferences-changed", () => { toolbar = null; renderCode(); renderToolbar(); renderStats(); findBar.labels(); printLabels(); });
 // Clicking the empty part of the page below the text puts the cursor at the end. When the document ends with a table,
 // a picture, or a shape, an empty paragraph is added after it first, so there is always a place to keep writing.
 document.addEventListener("mousedown", (event) => {
-  if (!view || event.target !== page()) return;
+  if (!view || codeOn() || sourceOn() || event.target !== page()) return;
   event.preventDefault();
   const { doc } = view.state, tr = view.state.tr;
   if (!doc.lastChild.isTextblock) tr.insert(doc.content.size, nodes.paragraph.create());
@@ -637,9 +822,28 @@ document.addEventListener("mousedown", (event) => {
 globalThis.EdukorsTextEditor = Object.freeze({
   schema,
   /** The content to save: the document's current state as JSON. */
-  toJSON: (doc) => { if (doc.editor?.source != null) applySource(doc); return doc.editor ? doc.editor.state.doc.toJSON() : doc.text ?? emptyDoc().toJSON(); },
-  /** Export (and saving back into a Markdown file): a document still matching its Markdown text writes that text as is. */
+  toJSON: (doc) => {
+    if (doc.editor?.code) return codeJSON(doc.editor.code.state.doc.toString()); // a file in the code view: one code block
+    if (doc.editor?.source != null) applySource(doc);
+    return doc.editor ? doc.editor.state.doc.toJSON() : doc.text ?? emptyDoc().toJSON();
+  },
+  /**
+   * Export (and saving back into a Markdown or plain-text file): a document still matching its Markdown text writes
+   * that text as is. A file in the code view saves (format "code") its text with its encoding and line ending, or the
+   * bytes it was read from while the text has not changed; it exports as one code block.
+   */
   async exportFor(doc, format, title) {
+    const code = doc.editor?.code;
+    if (code) {
+      const text = code.state.doc.toString();
+      if (format === "code") {
+        const bytes = code.bytes && code.state.doc.eq(code.savedDoc) ? code.bytes : encodeText(text, code);
+        code.written = { doc: code.state.doc, bytes };
+        return { data: bytes };
+      }
+      if (format === "txt") return { data: text };
+      return exportDocument(codeJSON(text), format, title);
+    }
     const json = EdukorsTextEditor.toJSON(doc), e = editOf(doc);
     if (format === "md" && e.markdown && e.state.doc.eq(e.markdown.doc)) return { data: e.markdown.text };
     const out = await exportDocument(json, format, title);
@@ -656,8 +860,24 @@ globalThis.EdukorsTextEditor = Object.freeze({
     e.saved = e.state.doc;
     if (typeof markdown === "string") e.markdown = { text: markdown, doc: e.state.doc };
   },
+  /** A file's bytes as text (src/editor/code-text.js): { text, eol, bom, encoding }. */
+  decodeCode: decodeText,
+  /**
+   * Gives a document a plain-text file's content, shown in the code view: { text, ext, eol, bom, encoding, bytes? }
+   * (bytes: the file as read, written back while the text has not changed).
+   */
+  adoptCode(doc, { text, ext, eol = "\n", bom = false, encoding = "utf-8", bytes = null }) {
+    const state = newCodeState(text, ext, { wrap: wrapLines, lang: lang() });
+    doc.text = codeJSON(text);
+    doc.editor = { state: newState(emptyDoc()), saved: null, code: { state, savedDoc: state.doc, bytes, ext, eol, bom, encoding, lang: lang() } };
+  },
+  /** How a file in the code view is written ({ ext, eol, bom, encoding }), or null for a formatted document. */
+  codeInfo: (doc) => { const code = doc.editor?.code; return code ? { ext: code.ext, eol: code.eol, bom: code.bom, encoding: code.encoding } : null; },
+  isCode,
   /** Selects the whole active document (the menu's Select All outside a text field). */
-  selectAll() { if (view) { view.focus(); view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 0, view.state.doc.content.size))); } },
+  selectAll() {
+    if (codeOn() && codeView) { codeView.focus(); codeView.dispatch({ selection: { anchor: 0, head: codeView.state.doc.length } }); return; }
+    if (view) { view.focus(); view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 0, view.state.doc.content.size))); } },
   /** Export and Import (src/editor/convert.js): exportDocument(json, format, title), importDocument(format, bytes). */
   exportDocument, importDocument,
   /**
@@ -665,8 +885,10 @@ globalThis.EdukorsTextEditor = Object.freeze({
    * read(doc) and change(doc, name, args) → result; each change is one undo step of that document.
    */
   ai: {
-    read: (doc) => ai.readDocument(editOf(doc).state),
+    // A file in the code view reads as one code block; the assistant does not change it.
+    read: (doc) => ai.readDocument(isCode(doc) ? newState(docFromJSON(EdukorsTextEditor.toJSON(doc))) : editOf(doc).state),
     change(doc, name, args) {
+      if (isCode(doc)) throw new Error("This is a code or plain-text file: the assistant can read it but not change it.");
       const operation = { insert_content: ai.insertContent, replace_blocks: ai.replaceBlocks, set_block_style: ai.setBlockStyle, format_text: ai.formatText,
         replace_text: ai.replaceText, insert_shape: ai.insertShape, insert_image: ai.insertImage }[name];
       if (!operation) throw new Error(`Unknown change "${name}".`);

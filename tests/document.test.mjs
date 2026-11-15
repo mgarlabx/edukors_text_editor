@@ -4,14 +4,19 @@ import assert from "node:assert/strict";
 import "edukors-common-ux/src/package/package.js";
 import "edukors-common-ux/src/ai/ui/ai-conversations.js";
 import { docFromJSON, emptyDoc, media } from "../src/editor/schema.js";
+import { decodeText } from "../src/editor/code-text.js";
 
 // The page's globals the document script uses, without a browser (the editor's model, not its view).
 globalThis.EdukorsAppConfig = { version: "v.26.11.02" };
 globalThis.EdukorsAiAssistant = { conversationsOf: () => [], restoreConversations: (doc, list) => { doc.restored = list; } };
+const codeJSON = (text) => ({ type: "doc", content: [{ type: "code_block", content: [{ type: "text", text }] }] });
 globalThis.EdukorsTextEditor = {
-  toJSON: (doc) => doc.text ?? emptyDoc().toJSON(),
+  toJSON: (doc) => (doc.code ? codeJSON(doc.code.text) : doc.text ?? emptyDoc().toJSON()),
   check: (json) => docFromJSON(json).toJSON(),
   adopt: (doc, json) => { doc.text = json; },
+  decodeCode: decodeText,
+  adoptCode: (doc, code) => { doc.code = code; },
+  codeInfo: (doc) => (doc.code ? { ext: doc.code.ext, eol: doc.code.eol, bom: doc.code.bom, encoding: doc.code.encoding } : null),
   media,
 };
 await import("../document.js");
@@ -75,4 +80,25 @@ test("pictures are saved as package parts and read back; a part that is not a pi
     parts: [{ name: "text/media/page.html", contentType: "text/html", content: "<script>alert(1)</script>" }] });
   const opened = await D.fromBytes(hostile);
   assert.deepEqual(opened.text.content.map((n) => n.type), ["paragraph"]);
+});
+
+test("a plain-text file opens as code; kept in an .etex (Save As, drafts) it opens in the code view again", async () => {
+  const bytes = new TextEncoder().encode("SELECT 1;\r\n\r\nSELECT 2;\r\n");
+  const opened = await D.importFile({ format: "code", extension: ".SQL", bytes });
+  assert.deepEqual(opened.conversations, []);
+  assert.equal(opened.code.text, "SELECT 1;\n\nSELECT 2;\n");
+  assert.equal(opened.code.ext, ".sql");
+  assert.equal(opened.code.eol, "\r\n");
+  assert.deepEqual(opened.code.bytes, bytes);
+  const doc = { id: 7 };
+  D.adopt(doc, opened);
+  assert.equal(doc.code.text, opened.code.text);
+  const pkg = await P.read((await D.toBytes(doc)).bytes);
+  assert.deepEqual(pkg.json("text/document.json").code, { ext: ".sql", eol: "\r\n", bom: false, encoding: "utf-8" });
+  const again = { id: 8 };
+  D.adopt(again, await D.fromBytes((await D.toBytes(doc)).bytes));
+  assert.deepEqual(again.code, { text: opened.code.text, ext: ".sql", eol: "\r\n", bom: false, encoding: "utf-8" });
+  // Settings that are not valid make it an ordinary document.
+  const odd = await P.write({ app: { name: "text" }, main: { name: "text/document.json", contentType: P.contentType("text", "document"), content: { format: "edukors.text.document", version: 1, doc: codeJSON("x"), code: { ext: "../x", eol: "\n", bom: false, encoding: "utf-8" } } } });
+  assert.equal((await D.fromBytes(odd)).code, undefined);
 });

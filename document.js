@@ -8,6 +8,10 @@
 // `doc` is the editor's content as ProseMirror JSON (src/editor/schema.js); reading checks every node, mark, and
 // attribute against that schema (EdukorsTextEditor.check). In the file, a picture's `src` is its relationship id; in
 // the editor, the key of the picture in EdukorsTextEditor.media.
+//
+// A plain-text file (code, data, notes) opens as it is and is saved back into its file (format "code"). Saved as an
+// .etex (or kept as a draft), it is one code block, and the main part also has `code`: { ext, eol, bom, encoding },
+// so it opens in the code view again.
 globalThis.EdukorsTextDocument = (() => {
   const APP = 'text';
   const MAIN = `${APP}/document.json`;
@@ -27,6 +31,7 @@ globalThis.EdukorsTextDocument = (() => {
     const conversations = EdukorsAiConversations.toPackage(APP, EdukorsAiAssistant.conversationsOf(doc));
     // Each distinct picture becomes one part; the document names it by relationship id.
     const json = structuredClone(EdukorsTextEditor.toJSON(doc)), ids = new Map(), parts = [], relationships = [];
+    const code = EdukorsTextEditor.codeInfo?.(doc) || null;
     const pictures = [];
     walk(json, node => {
       if (node.type !== 'image') return true;
@@ -46,7 +51,7 @@ globalThis.EdukorsTextDocument = (() => {
     }
     const bytes = await EdukorsPackage.write({
       app: { name: APP, version: EdukorsAppConfig.version },
-      main: { name: MAIN, contentType: EdukorsPackage.contentType(APP, 'document'), content: { format: FORMAT, version: VERSION, doc: json }, relationships: [...relationships, ...conversations.relationships] },
+      main: { name: MAIN, contentType: EdukorsPackage.contentType(APP, 'document'), content: { format: FORMAT, version: VERSION, doc: json, ...(code ? { code } : {}) }, relationships: [...relationships, ...conversations.relationships] },
       parts: [...parts, ...conversations.parts],
       properties: { title: name || undefined }
     });
@@ -77,17 +82,36 @@ globalThis.EdukorsTextDocument = (() => {
       walk(raw.doc, node => node?.type !== 'image' || (keys.has(node.attrs?.src) && ((node.attrs.src = keys.get(node.attrs.src)), true)));
       text = EdukorsTextEditor.check(raw.doc);
     } catch (error) { throw new Error(`The document's content is damaged (${error.message})`); }
-    return { text, conversations: EdukorsAiConversations.fromPackage(pkg) };
+    const conversations = EdukorsAiConversations.fromPackage(pkg);
+    const code = codeOf(raw.code, text);
+    return code ? { code, conversations } : { text, conversations };
+  }
+
+  // A code file kept in a package: its settings, checked, and the text of its code block; null for anything else.
+  const ENCODINGS = ['utf-8', 'utf-16le', 'utf-16be', 'windows-1252'];
+  function codeOf(info, json) {
+    if (!info || typeof info !== 'object') return null;
+    const { ext, eol, bom, encoding } = info;
+    if (typeof ext !== 'string' || !/^\.[a-z0-9]{1,10}$/i.test(ext) || !['\n', '\r\n'].includes(eol) || typeof bom !== 'boolean' || !ENCODINGS.includes(encoding)) return null;
+    const blocks = json.content || [];
+    if (blocks.length !== 1 || blocks[0].type !== 'code_block') return null;
+    return { text: (blocks[0].content || []).map(node => node.text || '').join(''), ext: ext.toLowerCase(), eol, bom, encoding };
   }
 
   function adopt(doc, content) {
-    EdukorsTextEditor.adopt(doc, content.text, { markdown: content.markdown });
+    if (content.code) EdukorsTextEditor.adoptCode(doc, content.code);
+    else EdukorsTextEditor.adopt(doc, content.text, { markdown: content.markdown });
     EdukorsAiAssistant.restoreConversations(doc, content.conversations || []);
   }
 
   // Export: PDF (A4), Markdown, and plain text; Print uses the same page as the PDF. Open also reads DOCX and PDF (text only). A Markdown file keeps its exact text, so it can be edited as source and saved as written.
+  // A plain-text file (format "code") opens in the code view and is saved back with the same encoding and line ending.
   const exportFile = ({ doc, format, title }) => EdukorsTextEditor.exportFor(doc, format, title);
-  async function importFile({ format, bytes }) {
+  async function importFile({ format, bytes, extension }) {
+    if (format === 'code') {
+      const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      return { code: { ...EdukorsTextEditor.decodeCode(data), ext: String(extension || '.txt').toLowerCase(), bytes: data }, conversations: [] };
+    }
     const markdown = format === 'md' ? new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '') : undefined;
     return { text: await EdukorsTextEditor.importDocument(format, bytes), conversations: [], markdown };
   }

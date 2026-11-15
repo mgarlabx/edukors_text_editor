@@ -99,3 +99,72 @@
 .text-page .search-match.is-current { background: #ffb347; box-shadow: 0 0 0 1px #e8890c; }
 
 .text-zoom-value { min-width: 4ch; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* The selection count in the status bar (src/editor/index.js), next to the version. */
+.statusbar .text-selection-stats { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.statusbar .text-selection-stats[hidden] { display: none; }
+
+/* The code view (src/editor/code.js): a plain-text file over the whole document area instead of the page, in the
+   interface's colors, so it follows the light and dark themes. CodeMirror scrolls inside it; the line numbers and
+   folding chevrons stay at the left.
+   Common keeps the document sheet light in the dark theme (it sets the interface colors again on the placeholder), so
+   the code view takes the interface's colors as they are on the root element. */
+:root {
+  --code-paper: var(--surface); --code-ink: var(--text, #263149); --code-gutter: var(--workspace); --code-rule: var(--border);
+  --code-muted: var(--icon); --code-accent: var(--accent);
+  /* A palette for red-green and blue-purple color blindness: only blue, orange/gold and neutral tones, set apart by
+     lightness, with bold, italic and underline as a second cue (keywords, types, tags and JSON keys are bold,
+     comments italic). */
+  --code-keyword: #0b3d91; --code-string: #a34400; --code-number: #b58900; --code-comment: #6b7280; --code-function: #0b7bc4;
+  --code-type: var(--code-ink); --code-property: var(--code-ink); --code-tag: #946b00; --code-definition: #1d4ed8; --code-operator: #6b7280; --code-invalid: #a34400;
+}
+:root[data-theme="dark"] {
+  --code-keyword: #7cb8ff; --code-string: #ffa657; --code-number: #f2cc60; --code-comment: #9ca3af; --code-function: #4fc3f7;
+  --code-type: var(--code-ink); --code-property: var(--code-ink); --code-tag: #f2cc60; --code-definition: #b6d6ff; --code-operator: #9ca3af; --code-invalid: #ffb454;
+}
+.workspace.text-workspace.code-workspace { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+#document-placeholder.text-page.code-page {
+  flex: 1; width: 100%; min-height: 0; height: auto; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+  background: var(--code-paper); color: var(--code-ink); font: inherit; cursor: auto;
+}
+#document-placeholder.text-page.code-page[hidden] { display: none; }
+.code-page .code-surface { height: 100%; }
+.code-page .code-surface[hidden] { display: none; }
+#document-placeholder .cm-editor { height: 100%; background: var(--code-paper); color: var(--code-ink); font-size: calc(13px * var(--code-zoom, 1)); }
+#document-placeholder .cm-editor.cm-focused { outline: none; }
+#document-placeholder .cm-scroller { font-family: Menlo, "SF Mono", Consolas, "Courier New", monospace; line-height: 1.55; }
+#document-placeholder .cm-content { padding: 8px 0 40vh; caret-color: var(--code-accent); }
+#document-placeholder .cm-line { padding: 0 16px 0 8px; }
+#document-placeholder .cm-cursor, #document-placeholder .cm-dropCursor { border-left: 2px solid var(--code-accent); }
+#document-placeholder .cm-gutters { border-right: 1px solid var(--code-rule); background: var(--code-gutter); color: var(--code-muted); }
+#document-placeholder .cm-lineNumbers .cm-gutterElement { min-width: 3ch; padding: 0 6px 0 12px; font-variant-numeric: tabular-nums; }
+#document-placeholder .cm-activeLineGutter { background: color-mix(in srgb, var(--code-accent) 12%, transparent); color: var(--code-ink); }
+#document-placeholder .cm-activeLine { background: color-mix(in srgb, var(--code-accent) 6%, transparent); }
+#document-placeholder .cm-selectionBackground, #document-placeholder .cm-content ::selection { background: color-mix(in srgb, var(--code-accent) 22%, transparent) !important; }
+#document-placeholder .cm-editor.cm-focused .cm-selectionBackground { background: color-mix(in srgb, var(--code-accent) 32%, transparent) !important; }
+#document-placeholder .cm-selectionMatch { background: color-mix(in srgb, var(--code-accent) 14%, transparent); }
+#document-placeholder .cm-matchingBracket { outline: 1px solid color-mix(in srgb, var(--code-accent) 60%, transparent); background: none; }
+#document-placeholder .cm-searchMatch { border-radius: 2px; background: #ffe58f99; }
+#document-placeholder .cm-searchMatch-selected { background: #ffb347cc; }
+:root[data-theme="dark"] #document-placeholder .cm-searchMatch { background: #b8860b66; }
+:root[data-theme="dark"] #document-placeholder .cm-searchMatch-selected { background: #e8890caa; }
+#document-placeholder .cm-specialChar { color: var(--code-invalid); }
+/* Folding: a chevron beside each block that folds (down while open, right when folded); the open ones show while
+   the pointer is over the gutter, the folded ones always. */
+#document-placeholder .cm-foldGutter .cm-gutterElement { display: flex; align-items: center; justify-content: center; width: 18px; padding: 0 2px; cursor: pointer; }
+#document-placeholder .code-fold { display: flex; color: var(--code-muted); }
+#document-placeholder .code-fold:hover { color: var(--code-accent); }
+#document-placeholder .code-fold.is-open { opacity: 0; transition: opacity .15s; }
+#document-placeholder .cm-gutters:hover .code-fold.is-open { opacity: 1; }
+#document-placeholder .cm-foldPlaceholder { margin: 0 2px; padding: 0 6px; border: 1px solid var(--code-rule); border-radius: 4px; background: var(--code-gutter); color: var(--code-muted); }
+/* CodeMirror's find panel, at the top of the file. */
+#document-placeholder .cm-panels { border-color: var(--code-rule); background: var(--code-gutter); color: var(--code-ink); font-size: calc(12px * var(--font-scale, 1)); }
+#document-placeholder .cm-panels.cm-panels-top { border-bottom: 1px solid var(--code-rule); }
+#document-placeholder .cm-panel.cm-search { padding: 6px 28px 6px 10px; }
+#document-placeholder .cm-panel.cm-search label { color: var(--code-muted); }
+#document-placeholder .cm-textfield { padding: 3px 6px; border: 1px solid var(--code-rule); border-radius: 5px; background: var(--code-paper); color: inherit; font: inherit; }
+#document-placeholder .cm-textfield:focus { border-color: var(--code-accent); outline: 1px solid var(--code-accent); }
+#document-placeholder .cm-button { padding: 3px 8px; border: 1px solid var(--code-rule); border-radius: 5px; background: var(--code-paper); background-image: none; color: inherit; font: inherit; cursor: pointer; }
+#document-placeholder .cm-button:hover { border-color: var(--code-accent); }
+#document-placeholder .cm-panel.cm-search [name="close"] { color: var(--code-muted); cursor: pointer; }
+#document-placeholder .cm-tooltip { border: 1px solid var(--code-rule); background: var(--code-paper); color: var(--code-ink); }

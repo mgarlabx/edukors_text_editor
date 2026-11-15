@@ -29,6 +29,11 @@ fileAssociations:
     name: Edukors Text Document
     mimeType: application/vnd.edukors.text+zip
     role: Editor
+  # Plain-text files (code, data, notes): offered in "Open with", without becoming their default app.
+  - ext: [txt, log, csv, tsv, py, php, phtml, sql, js, mjs, cjs, jsx, ts, tsx, html, htm, css, json, xml, svg, yaml, yml, sh, toml, ini]
+    name: Plain Text File
+    role: Editor
+    rank: Alternate
 publish:
   provider: github
   owner: mgarlabx
