@@ -1,7 +1,7 @@
 // What makes this app the Text Editor inside the shared shell (Edukors Common, docs/common-shell.md "App integration").
 globalThis.EdukorsAppConfig = {
   name: 'Edukors Text Editor',
-  version: 'v.26.11.14',            // the release date; package.json holds the same date as 26.11.14
+  version: 'v.26.11.16',            // the release date; package.json holds the same date as 26.11.16
   // Version of the terms of use below. The app asks once per version; change it when the terms change.
   termsVersion: '2026-11-02.2',
   // No left sidebar (Common's placeholder panel and its toolbar toggle).
@@ -252,7 +252,7 @@ The software is provided "as is", without warranty of any kind, express or impli
 Your documents stay on your computer; the editor sends them nowhere on its own. Two features use the internet:
 
 - The **AI assistant** uses the account you connect in Settings → AI assistant. What you ask and the content of the document it works on go to that service. Its use follows that service's terms, and any costs are yours.
-- The editor checks the project's page on GitHub for new versions.
+- The editor checks the project's page on GitHub for new versions and downloads them from there.
 
 ## Source code
 
@@ -292,7 +292,7 @@ O software é fornecido "no estado em que se encontra", sem garantia de nenhum t
 Seus documentos ficam no seu computador; o editor não os envia a lugar nenhum por conta própria. Dois recursos usam a internet:
 
 - O **assistente de IA** usa a conta que você conecta em Configurações → Assistente de IA. O que você pede e o conteúdo do documento em que ele trabalha vão para esse serviço. O uso segue os termos do serviço, e os custos ficam com você.
-- O editor consulta a página do projeto no GitHub para saber de novas versões.
+- O editor consulta a página do projeto no GitHub para saber de novas versões e as baixa de lá.
 
 ## Código-fonte
 
@@ -334,7 +334,7 @@ El software se proporciona "tal cual", sin garantía de ningún tipo, expresa o 
 Sus documentos se quedan en su computadora; el editor no los envía a ningún lugar por su cuenta. Dos funciones usan internet:
 
 - El **asistente de IA** usa la cuenta que usted conecta en Configuración → Asistente de IA. Lo que usted pide y el contenido del documento en el que trabaja van a ese servicio. Su uso sigue los términos de ese servicio, y los costos corren por su cuenta.
-- El editor consulta la página del proyecto en GitHub para saber de nuevas versiones.
+- El editor consulta la página del proyecto en GitHub para saber de nuevas versiones y las descarga de allí.
 
 ## Código fuente
 

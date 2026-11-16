@@ -110,6 +110,8 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
+            release/*.blockmap
+            release/latest*.yml
           if-no-files-found: error
           retention-days: 7
       # The MSIX goes to the Microsoft Store (the store job below, store.yml), not to the GitHub release.

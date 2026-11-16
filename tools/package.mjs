@@ -14,7 +14,8 @@ try {
   execFileSync(process.execPath, [require.resolve("electron-builder/cli.js"), platform, "--publish", "never", `-c.directories.output=${out}`, ...process.argv.slice(2)], { stdio: "inherit" });
   await mkdir(release, { recursive: true });
   for (const entry of await readdir(out, { withFileTypes: true })) {
-    if (entry.isFile() && !entry.name.endsWith(".yml") && !entry.name.endsWith(".blockmap")) await copyFile(join(out, entry.name), join(release, entry.name));
+    // latest*.yml and the .blockmap files go with the installers: the release needs them for updates inside the app.
+    if (entry.isFile() && entry.name !== "builder-debug.yml" && entry.name !== "builder-effective-config.yaml") await copyFile(join(out, entry.name), join(release, entry.name));
     // The unpacked app is copied only when asked for (--dir): it is large, and release/ may sit in a synced folder.
     if (process.argv.includes("--dir") && entry.isDirectory() && /unpacked|^mac/.test(entry.name)) await cp(join(out, entry.name), join(release, entry.name), { recursive: true, verbatimSymlinks: true });
   }

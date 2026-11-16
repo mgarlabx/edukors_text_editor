@@ -6,7 +6,7 @@ Edukors Text Editor collects **no data**. It has no telemetry, analytics, crash 
 
 | When | Where | What is sent |
 | --- | --- | --- |
-| At startup and every few hours | GitHub (`api.github.com`) | A request for the latest release, to offer updates. Not done in the Microsoft Store version, which is updated by the store. |
+| At startup and every few hours | GitHub (`github.com`, `api.github.com`) | A request for the latest release and, when there is a newer one, the download of its installer. Not done in the Microsoft Store version, which is updated by the store. |
 | Only if you set up an AI account and use the assistant | The AI CLI you chose (Claude Code or Codex), which talks to its own vendor | Your requests and the parts of the document the assistant needs. This is governed by that vendor's terms and privacy policy, under your own account. |
 | Only when the assistant downloads a file from the web | The web address requested | An ordinary file request. |
 | Only if you add MCP servers to an AI account | The servers you added | What the assistant asks those servers, under their own policies. |

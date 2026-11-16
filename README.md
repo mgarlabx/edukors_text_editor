@@ -158,7 +158,7 @@ The links always give the latest version; every version is on the [releases](htt
 
 **Help and terms of use.** The Help button opens a quick guide and the terms of use (the MIT license, explained), which the editor asks you to accept the first time it opens. The interface is available in English, Portuguese and Spanish.
 
-**Updates.** The app checks this repository's releases and says when a new version is out.
+**Updates.** The app checks this repository's releases. On macOS, Windows (the `.exe`) and the AppImage, a new version downloads in the background and the app offers to restart into it (it is also installed the next time you quit). The `.deb` gets a link to download the new installer. The Microsoft Store version is updated by the Store.
 
 **Optional: the AI assistant.** Install [Claude Code](https://claude.com/claude-code) (`claude`) or [Codex](https://developers.openai.com/codex/cli/) (`codex`) on your computer; the editor never downloads them for you. Then add an account in the editor and sign in. The accounts are shared with the other Edukors apps on this computer.
 
